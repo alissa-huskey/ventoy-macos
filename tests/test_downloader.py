@@ -1,37 +1,11 @@
 from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
-from shutil import copy, copytree
 
+from tests import copy_fixture
 from ventoy_macos.downloader import decompress, download, extract, get_latest
 
 bp = breakpoint
-
-
-def copy_fixture(name: str, dest: Path) -> Path:
-    """Copy fixtures.
-
-    Arguments:
-        name (str): name of file or directory to copy
-        dest (Path): path to destination directory
-
-    Returns:
-        Path to copied file or directory
-    """
-    fixtures = Path(__file__).parent / "fixtures"
-    source = fixtures / name
-    path = dest / name
-
-    if source.is_dir():
-        copier = copytree
-    elif source.is_file():
-        copier = copy
-    else:
-        raise Exception(f"Not a valid fixture: {source}")
-
-    copier(source, path)
-
-    return path
 
 
 def test_decompress(tmp_path):
@@ -61,16 +35,17 @@ def test_download(tmp_path, monkeypatch):
         path = Path(dest)
         path.write_text(url)
 
-    monkeypatch.setattr("urllib.request.urlretrieve", urlretrieve)
+    with monkeypatch.context() as m:
+        m.setattr("urllib.request.urlretrieve", urlretrieve)
 
-    version = "1.1.11"
-    name = f"ventoy-{version}-linux.tar.gz"
-    url = f"https://github.com/ventoy/Ventoy/releases/download/v{version}/{name}"
-    dest = tmp_path / name
-    result = download(version, str(tmp_path))
+        version = "1.1.11"
+        name = f"ventoy-{version}-linux.tar.gz"
+        url = f"https://github.com/ventoy/Ventoy/releases/download/v{version}/{name}"
+        dest = tmp_path / name
+        result = download(version, str(tmp_path))
 
-    assert result == str(dest)
-    assert dest.is_file() and dest.read_text() == url
+        assert result == str(dest)
+        assert dest.is_file() and dest.read_text() == url
 
 
 def test_extract(tmp_path):
@@ -97,11 +72,12 @@ def test_get_latest(monkeypatch):
         """Mock urlopen."""
         yield StringIO('{"tag_name": "v1.1.12"}')
 
-    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    with monkeypatch.context() as m:
+        m.setattr("urllib.request.urlopen", urlopen)
 
-    tag = get_latest()
+        tag = get_latest()
 
-    assert tag == "1.1.12"
+        assert tag == "1.1.12"
 
 
 #  def test_():

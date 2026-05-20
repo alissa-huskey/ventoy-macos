@@ -7,7 +7,7 @@ from pathlib import Path
 from shutil import copy
 
 from ventoy_macos import VentoyMacosError
-from ventoy_macos.common import require, run
+from ventoy_macos.common import run
 
 REPO = "ventoy/Ventoy"
 
@@ -15,8 +15,7 @@ bp = breakpoint
 
 
 def get_latest() -> str:
-    """Return the git tag name for the latest ventoy release. """
-
+    """Return the git tag name for the latest ventoy release."""
     url = f"https://api.github.com/repos/{REPO}/releases/latest"
     req = urllib.request.Request(url, headers={"User-Agent": "ventoy-macos-install"})
     with urllib.request.urlopen(req, timeout=15) as resp:
@@ -72,8 +71,6 @@ def decompress(ventoy_dir: str, workdir: str):
     Returns:
         Paths to boot_img, core_img and disk_img
     """
-    require("xzcat")
-
     ventoy_dir = Path(ventoy_dir)
     workdir = Path(workdir)
 

@@ -7,6 +7,15 @@ from ventoy_macos.object import Object as Stub
 bp = breakpoint
 
 
+COMMANDS = []
+
+
+def run(args, **kwargs):
+    """Mock run command."""
+    COMMANDS.append(args)
+    return Stub(returncode=0)
+
+
 def test_disk():
     disk = Disk()
     assert disk
@@ -29,9 +38,10 @@ def test_disk_sectors(monkeypatch):
     info = {"disk size": "5.4 GB (5368664064 Bytes) (exactly 10485672 512-Byte-Units)"}
 
     disk = Disk()
-    monkeypatch.setattr(disk, "info", info)
+    with monkeypatch.context() as m:
+        m.setattr(disk, "info", info)
 
-    assert disk.sectors == 10485672
+        assert disk.sectors == 10485672
 
 
 @pytest.mark.parametrize(["location", "exists"], [
@@ -49,9 +59,11 @@ def test_disk_exists(location, exists):
 ])
 def test_disk_is_external(monkeypatch, info, is_external):
     disk = Disk()
-    monkeypatch.setattr(disk, "info", info)
 
-    assert disk.is_external() is is_external
+    with monkeypatch.context() as m:
+        m.setattr(disk, "info", info)
+
+        assert disk.is_external() is is_external
 
 
 @pytest.mark.parametrize(["location", "is_disk"], [
@@ -90,9 +102,10 @@ def test_disk_gb(monkeypatch):
     info = {"disk size": "5.4 GB (5368664064 Bytes) (exactly 10485672 512-Byte-Units)"}
 
     disk = Disk()
-    monkeypatch.setattr(disk, "info", info)
+    with monkeypatch.context() as m:
+        m.setattr(disk, "info", info)
 
-    assert disk.gb == 4.999958038330078
+        assert disk.gb == 4.999958038330078
 
 
 def test_disk_current_layout(monkeypatch):
@@ -110,24 +123,60 @@ def test_disk_current_layout(monkeypatch):
    7:                APFS Volume Nix Store               1.3 GB     disk3s7
 """
     disk = Disk()
-    monkeypatch.setattr(disk_module, "run", lambda args: Stub(stdout=layout))
-    assert disk.current_layout == layout
+
+    with monkeypatch.context() as m:
+        m.setattr(disk_module, "run", lambda args: Stub(stdout=layout))
+        assert disk.current_layout == layout
 
 
-def test_disk_planned_layout(monkeypatch):
+def test_disk_planned_layout(planned_layout, sectors_64g):
     disk = Disk()
-    disk.sectors = 125000000  # 64G
+    disk.sectors = sectors_64g
 
-    expected = {
-        "part1_start": 2048,
-        "part1_end": 124934423,
-        "part1_sectors": 124932376,
-        "part2_start": 124934424,
-        "part2_end": 124999959,
-        "part2_sectors": 65536,
-    }
+    assert disk.planned_layout == planned_layout
 
-    assert disk.planned_layout == expected
+
+@pytest.mark.parametrize(["offset", "is_correct"], [
+    ("2048", True),
+    ("92423", False),
+])
+def test_disk_verify(monkeypatch, offset, is_correct):
+    info = {"offset": offset}
+
+    disk = Disk()
+    with monkeypatch.context() as m:
+        m.setattr(disk, "info", info)
+
+        assert disk.verify() is is_correct
+
+
+def test_disk_mount(monkeypatch):
+    with monkeypatch.context() as m:
+        m.setattr(disk_module, "run", run)
+        disk = Disk("/dev/disk67")
+        disk.mount()
+
+        assert COMMANDS.pop() == ["diskutil", "mountDisk", "/dev/disk67"]
+
+
+def test_disk_unmount(monkeypatch):
+    with monkeypatch.context() as m:
+        m.setattr(disk_module, "run", run)
+        disk = Disk("/dev/disk67")
+        disk.unmount()
+
+        assert COMMANDS.pop() == ["diskutil", "unmountDisk", "force", "/dev/disk67"]
+
+
+def test_disk_format(monkeypatch):
+    with monkeypatch.context() as m:
+        m.setattr(disk_module, "run", run)
+        device = "/dev/disk67s1"
+        disk = Disk(device)
+        success = disk.format()
+
+        assert success
+        assert COMMANDS.pop() == ["newfs_exfat", "-v", "Ventoy", device]
 
 
 #  def test_disk_():

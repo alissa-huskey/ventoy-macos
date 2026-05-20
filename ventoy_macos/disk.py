@@ -8,7 +8,6 @@ from ventoy_macos import VentoyMacosError
 from ventoy_macos.common import run
 from ventoy_macos.object import Object
 
-
 bp = breakpoint
 
 
@@ -22,6 +21,7 @@ class Disk(Object):
     _sectors = None
 
     def __init__(self, device: str = None, **kwargs):
+        """Initialize object."""
         self.device = device
         super().__init__(**kwargs)
 
@@ -147,3 +147,22 @@ class Disk(Object):
             "part2_end": part2_end,
             "part2_sectors": part2_end - part2_start + 1,
         }
+
+    def verify(self) -> bool:
+        """Verify the partition 1 offset."""
+        return self.info and "offset" in self.info and self.info["offset"] == "2048"
+
+    def mount(self):
+        """Mount the disk."""
+        run(["diskutil", "mountDisk", self.device], check=False)
+
+    def unmount(self):
+        """Mount the disk."""
+        run(["diskutil", "unmountDisk", "force", self.device], check=False)
+
+    def format(self):
+        """Format the disk."""
+        result = run(["newfs_exfat", "-v", "Ventoy", self.device], check=False)
+        if result.returncode != 0:
+            result = run(["diskutil", "eraseVolume", "ExFAT", "Ventoy", self.device])
+        return result.returncode == 0

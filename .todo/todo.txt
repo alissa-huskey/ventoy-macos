@@ -1,0 +1,4 @@
+2026-05-19 Move SECTOR_SIZE out of Disk
+2026-05-19 Refactor disk.planned_layout
+2026-05-19 Disk.format(): add test for fallback to diskutil
+2026-05-19 use `make_entries()` and `make_entries_cnc()` functions

@@ -7,15 +7,8 @@ from ventoy_macos import VentoyMacosError
 
 def has(cmd):
     """Return True if command is found on the CLI."""
-    result = run(["command", "-v", cmd])
+    result = run(["command", "-v", cmd], check=False)
     return result.returncode == 0
-
-
-def require(*cmds):
-    """Raise an exception if any commands are not found."""
-    for cmd in cmds:
-        if not has(cmd):
-            raise VentoyMacosError(f"Missing required command: {cmd}")
 
 
 def run(cmd, check=True, capture=True, timeout=30):
