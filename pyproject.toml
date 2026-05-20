@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "ventoy-macos"
+version = "0.1.0"
+description = "Install Ventoy on a USB drive from macOS."
+authors = ["Alissa Huskey <alissa.huskey@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.11"
+
+[tool.poetry.group.dev.dependencies]
+isort = "^8.0.1"
+pynvim = "*"
+pytest = "*"
+pdbpp = "*"
+ipython = "*"
+pylama = "*"
+pylint = "*"
+black = "*"
+pycodestyle = "*"
+flake8 = "*"
+flake8-black = "*"
+flake8-docstrings = "*"
+flake8-isort = "*"
+
+[tool.pytest.ini_options]
+addopts = "-xv"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,5 @@
+"""VentoyMacos."""
+
+
+class VentoyMacosError(Exception):
+    ...
