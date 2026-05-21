@@ -25,10 +25,18 @@ class Object():
         Object(a=1, b=2, c=3, d=4)
     """
 
+    ATTRS: dict = {}
+    """Attributes to set on initialization (if missing) and default values."""
+
     def __init__(self, **kwargs):
         """Set all keyword args as attributes."""
         for k, v in kwargs.items():
             setattr(self, k, v)
+
+        # set attributes and default values (defined on subclasses)
+        for k, v in self.ATTRS.items():
+            if not hasattr(self, k):
+                setattr(self, k, v)
 
     def __repr__(self):
         """Object(attr='value')."""

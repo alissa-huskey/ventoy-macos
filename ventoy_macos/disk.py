@@ -4,6 +4,7 @@ from functools import cached_property
 from pathlib import Path
 from re import compile as re_compile
 
+from ventoy_macos import SECTOR_SIZE as _SECTOR_SIZE
 from ventoy_macos import VentoyMacosError
 from ventoy_macos.common import run
 from ventoy_macos.object import Object
@@ -15,7 +16,7 @@ class Disk(Object):
     """A disk object."""
 
     SECTOR_NUM = 65536  # 32MB for EFI partition
-    SECTOR_SIZE = 512
+    SECTOR_SIZE = _SECTOR_SIZE
     SIZE_RE = re_compile(r'\((\d+) Bytes\)')
 
     _sectors = None

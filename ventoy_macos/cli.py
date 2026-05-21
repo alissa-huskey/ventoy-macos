@@ -5,12 +5,12 @@ import os
 import sys
 import tempfile
 import time
-import uuid
+from pathlib import Path
 
+from ventoy_macos.builder import Builder
 from ventoy_macos.common import has
 from ventoy_macos.disk import Disk
 from ventoy_macos.downloader import decompress, download, extract, get_latest
-from ventoy_macos.fd import FD
 from ventoy_macos.gpt import build_gpt
 
 
@@ -239,79 +239,70 @@ def write_to_disk(
     disk_img_path,
 ):
     """Write GPT and Ventoy boot code to the disk."""
-    boot_img = open(boot_img_path, "rb").read()
-    core_img = open(core_img_path, "rb").read()
-    disk_img = open(disk_img_path, "rb").read()
+    # TODO: a path should be passed in instead of a string
+    path = Path(boot_img_path).parent
 
     disk = Disk(device)
+    builder = Builder(
+        disk,
+        layout=layout,
+        mbr=mbr,
+        primary=primary,
+        entries=entries,
+        backup=backup,
+        images_path=path,
+    )
 
-    # Unmount
     print("Unmounting disk...")
-    disk.unmount()
-    time.sleep(2)
+    builder.unmount()
 
     print("Writing to disk...")
-    fd = FD(disk)
-    fd.open()
 
-    try:
-        # Zero first 1MB (protective MBR + GPT header + entries area)
+    with builder.fd.open():
+        # (protective MBR + GPT header + entries area)
         print("  Zeroing first 1MB...")
-        fd.write(0, b"\x00" * (2048 * Disk.SECTOR_SIZE))
+        builder.write_init_header()
 
-        # Zero backup GPT area
         print("  Zeroing backup GPT area...")
-        fd.write(
-            (disk_sectors - 33) * Disk.SECTOR_SIZE,
-            b"\x00" * (33 * Disk.SECTOR_SIZE)
-        )
+        builder.write_init_backup()
 
-        # Write protective MBR
         print("  Writing protective MBR...")
-        fd.write(0, mbr)
+        builder.write_mbr()
 
-        # Write primary GPT header (sector 1)
+        # sector 1
         print("  Writing primary GPT header...")
-        fd.write(Disk.SECTOR_SIZE, primary)
+        builder.write_primary_header()
 
-        # Write primary GPT entries (sectors 2-33)
+        # sectors 2-33
         print("  Writing GPT entries...")
-        fd.write(2 * Disk.SECTOR_SIZE, entries)
+        builder.write_entries()
 
-        # Write backup GPT entries + header
+        # (+ header)
         print("  Writing backup GPT...")
-        fd.write((disk_sectors - 33) * Disk.SECTOR_SIZE, entries)
-        fd.write((disk_sectors - 1) * Disk.SECTOR_SIZE, backup)
+        builder.write_backup()
 
-        # Write Ventoy boot.img (446 bytes of BIOS boot code to MBR)
+        # 446 bytes of BIOS boot code to MBR
         print("  Writing Ventoy boot.img...")
-        fd.patch(0, 0, boot_img[:446])
+        builder.write_boot_img()
 
         # GPT marker at offset 92
-        fd.patch(0, 92, b"\x22")
+        builder.write_gpt_marker(92, b"\x22")
 
-        # Write core.img to sectors 34-2047 (GPT gap area)
+        # sectors 34-2047 (GPT gap area)
         print("  Writing core.img...")
-        core = core_img[: 2014 * Disk.SECTOR_SIZE]
-        if len(core) % Disk.SECTOR_SIZE:
-            core += b"\x00" * (Disk.SECTOR_SIZE - len(core) % Disk.SECTOR_SIZE)
-        fd.write(34 * Disk.SECTOR_SIZE, core)
+        builder.write_core_img()
 
         # Second GPT marker at offset 17908
-        fd.patch(17908 // Disk.SECTOR_SIZE, 17908 % Disk.SECTOR_SIZE, b"\x23")
+        builder.write_second_gpt_marker()
 
-        # Write ventoy.disk.img to partition 2
-        part2_start = layout["part2_start"]
-        print(f"  Writing ventoy.disk.img at sector {part2_start}...")
-        fd.write(part2_start * Disk.SECTOR_SIZE, disk_img)
+        print("  Writing ventoy.disk.img to partition 2...")
+        builder.write_disk_img()
 
         # Disk UUID at offset 384
-        fd.patch(0, 384, uuid.uuid4().bytes)
+        builder.write_disk_uuid()
 
         # Disk signature at offset 440
-        fd.patch(0, 440, os.urandom(4))
+        builder.write_disk_signature()
 
-        fd.save()
-        print("  All writes complete.")
-    finally:
-        fd.close()
+        builder.fd.save()
+    print("  All writes complete.")

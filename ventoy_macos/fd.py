@@ -2,6 +2,7 @@
 
 import os
 
+from ventoy_macos import SECTOR_SIZE
 from ventoy_macos.disk import Disk
 from ventoy_macos.object import Object
 
@@ -20,8 +21,9 @@ class FD(Object):
 
         Returns `self`, which allows it to be used as a context manager.
         """
-        self.id = os.open(self.disk.raw_device, os.O_RDWR)
-        self.is_open = True
+        if not self.is_open:
+            self.id = os.open(self.disk.raw_device, os.O_RDWR)
+            self.is_open = True
         return self
 
     def close(self):
@@ -57,8 +59,8 @@ class FD(Object):
 
     def patch(self, sector_num, offset, data):
         """Read-modify-write a sector to patch sub-sector bytes."""
-        sector_start = sector_num * Disk.SECTOR_SIZE
-        contents = bytearray(self.read(sector_start, Disk.SECTOR_SIZE))
+        sector_start = sector_num * SECTOR_SIZE
+        contents = bytearray(self.read(sector_start, SECTOR_SIZE))
         contents[offset: offset + len(data)] = data
         self.write(sector_start, bytes(contents))
 

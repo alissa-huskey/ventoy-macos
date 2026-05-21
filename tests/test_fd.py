@@ -1,21 +1,10 @@
 import os
-from string import ascii_lowercase
 
 import pytest
 
-from ventoy_macos.disk import Disk
 from ventoy_macos.fd import FD
 
 bp = breakpoint
-
-
-@pytest.fixture
-def fake_disk(fs):
-    """Return a Disk object that exists on a fake filesystem."""
-    disk = Disk("/dev/disk67")
-    fs.create_file(disk.raw_device, contents=ascii_lowercase + "x" * 512)
-
-    return disk
 
 
 @pytest.fixture

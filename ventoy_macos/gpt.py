@@ -4,7 +4,7 @@ import struct
 import uuid
 import zlib
 
-from ventoy_macos.disk import Disk
+from ventoy_macos import SECTOR_SIZE
 
 GPT_BASIC_DATA_GUID = uuid.UUID("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7")
 
@@ -47,7 +47,7 @@ def make_gpt_header(params):
     )
     crc = zlib.crc32(data) & 0xFFFFFFFF
     data = data[:16] + struct.pack("<I", crc) + data[20:]
-    return data + b"\x00" * (Disk.SECTOR_SIZE - len(data))
+    return data + b"\x00" * (SECTOR_SIZE - len(data))
 
 
 def make_entries(e1, e2):

@@ -1,6 +1,9 @@
 from pathlib import Path
+from string import ascii_lowercase
 
 import pytest
+
+from ventoy_macos.disk import Disk
 
 
 @pytest.fixture
@@ -26,3 +29,12 @@ def planned_layout():
         "part2_end": 124999959,
         "part2_sectors": 65536,
     }
+
+
+@pytest.fixture
+def fake_disk(fs):
+    """Return a Disk object that exists on a fake filesystem."""
+    disk = Disk("/dev/disk67")
+    fs.create_file(disk.raw_device, contents=ascii_lowercase + "x" * 512)
+
+    return disk

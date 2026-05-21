@@ -1,6 +1,6 @@
 from subprocess import CompletedProcess
 
-from ventoy_macos.common import has, run
+from ventoy_macos.common import b2s, has, run, s2b
 
 bp = breakpoint
 
@@ -16,6 +16,18 @@ def test_run():
 def test_has():
     assert has("xxx") is False
     assert has("echo") is True
+
+
+def test_s2b():
+    size = s2b(1)
+
+    assert size == 512
+
+
+def test_b2s():
+    sectors = b2s(1152)
+    assert sectors == (2, 128)
+
 
 #  def test_():
 #      """
