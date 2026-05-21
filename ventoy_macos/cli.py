@@ -5,6 +5,7 @@ import os
 import sys
 import time
 
+from ventoy_macos import VentoyMacosError
 from ventoy_macos.app import App
 from ventoy_macos.builder import Builder
 from ventoy_macos.common import run
@@ -16,7 +17,7 @@ class CLI():
 
     def err(self, *msg):
         """Print an error message to stderr."""
-        print("\n\033[31mERROR\033[0m:", *msg, file=sys.stderr)
+        print("\033[31mERROR\033[0m:", *msg, file=sys.stderr)
 
     def die(self, *msg):
         """Print an error message and exit."""
@@ -44,9 +45,9 @@ class CLI():
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
     Examples:
-        sudo python3 ventoy-macos-install.py /dev/disk4
-        sudo python3 ventoy-macos-install.py /dev/disk4 --ventoy-version 1.1.10
-        sudo python3 ventoy-macos-install.py /dev/disk4 --exfat
+        sudo ventoy-macos /dev/disk4
+        sudo ventoy-macos /dev/disk4 --ventoy-version 1.1.10
+        sudo ventoy-macos /dev/disk4 --exfat
             """,
         )
         parser.add_argument("disk", help="Target disk device (e.g., /dev/disk4)")
@@ -63,12 +64,12 @@ class CLI():
 
         self.args = parser.parse_args()
 
-    def validate(self, disk):
+    def validate(self):
         """Check system and disk requirements."""
         if os.geteuid() != 0:
             self.die(
                 "This script must be run as root. "
-                "Use: sudo python3 ventoy-macos-install.py ..."
+                "Use: sudo ventoy-macos ..."
             )
 
         if sys.platform != "darwin":
@@ -79,10 +80,10 @@ class CLI():
             self.die("xz is required but not found. Install it with: brew install xz")
 
         # Validate disk
-        if not disk.is_disk():
-            self.die(f"Invalid disk device: {disk}")
+        if not self.disk.is_disk():
+            self.die(f"Invalid disk device: {self.disk}")
 
-        if disk.is_system_disk():
+        if self.disk.is_system_disk():
             self.die("Refusing to operate on disk0/disk1 (likely your system disk).")
 
     def show_disk_info(self):
@@ -222,6 +223,7 @@ class CLI():
         app = self.app = App(self.args)
         self.disk = app.disk
 
+        self.validate()
         self.show_disk_info()
 
         print(f"\nWorking directory: {app.workdir}")
@@ -254,3 +256,12 @@ class CLI():
 
         # Print success message
         self.success()
+
+
+def main():
+    """Run the program."""
+    try:
+        cli = CLI()
+        cli.run()
+    except VentoyMacosError as e:
+        cli.die(str(e))

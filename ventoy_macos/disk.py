@@ -26,6 +26,10 @@ class Disk(Object):
         self.device = device
         super().__init__(**kwargs)
 
+    def __str__(self):
+        """Return a human readable string."""
+        return self.device or "Disk()"
+
     @cached_property
     def name(self) -> bool:
         """Return the disk identifier."""

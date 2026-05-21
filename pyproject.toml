@@ -6,6 +6,9 @@ authors = ["Alissa Huskey <alissa.huskey@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 
+[tool.poetry.scripts]
+ventoy-macos = "ventoy_macos.cli:main"
+
 [tool.poetry.dependencies]
 python = "3.11"
 attr = { git = "https://github.com/alissa-huskey/attr.git" }
