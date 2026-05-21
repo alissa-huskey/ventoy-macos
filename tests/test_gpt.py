@@ -3,9 +3,9 @@ from uuid import UUID
 import pytest
 
 from tests import data
-from ventoy_macos.gpt import (GPT_BASIC_DATA_GUID, build_gpt, make_entries,
-                              make_entries_crc, make_gpt_entry,
-                              make_gpt_header, uuid_to_mixed_endian)
+from ventoy_macos.gpt import (GPT_BASIC_DATA_GUID, build_gpt, make_crc,
+                              make_entries, make_gpt_entry, make_gpt_header,
+                              uuid_to_mixed_endian)
 
 bp = breakpoint
 
@@ -62,8 +62,8 @@ def test_make_entries():
     assert result == data.entries
 
 
-def test_make_entries_crc(crc):
-    result = make_entries_crc(data.entries)
+def test_make_crc(crc):
+    result = make_crc(data.entries)
     assert result == crc
 
 

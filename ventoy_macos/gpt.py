@@ -11,6 +11,16 @@ GPT_BASIC_DATA_GUID = uuid.UUID("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7")
 bp = breakpoint
 
 
+def make_entries(e1, e2):
+    """Combine e1 and e2."""
+    return e1 + e2 + b"\x00" * (128 * 128 - 256)
+
+
+def make_crc(data):
+    """Make crc."""
+    return zlib.crc32(data) & 0xFFFFFFFF
+
+
 def uuid_to_mixed_endian(u):
     """Convert a UUID to mixed endian."""
     b = u.bytes
@@ -45,19 +55,9 @@ def make_gpt_header(params):
         params["entry_size"],
         params["entries_crc"],
     )
-    crc = zlib.crc32(data) & 0xFFFFFFFF
+    crc = make_crc(data)
     data = data[:16] + struct.pack("<I", crc) + data[20:]
     return data + b"\x00" * (SECTOR_SIZE - len(data))
-
-
-def make_entries(e1, e2):
-    """Combine e1 and e2."""
-    return e1 + e2 + b"\x00" * (128 * 128 - 256)
-
-
-def make_entries_crc(entries):
-    """Make entries crc."""
-    return zlib.crc32(entries) & 0xFFFFFFFF
 
 
 def build_gpt(disk_sectors, layout):
@@ -80,8 +80,8 @@ def build_gpt(disk_sectors, layout):
         0,
         "VTOYEFI",
     )
-    entries = e1 + e2 + b"\x00" * (128 * 128 - 256)
-    entries_crc = zlib.crc32(entries) & 0xFFFFFFFF
+    entries = make_entries(e1, e2)
+    entries_crc = make_crc(entries)
 
     common = {
         "disk_guid": disk_guid,
