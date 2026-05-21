@@ -1,5 +1,16 @@
+"""Ventoy for macOS."""
 from pathlib import Path
 from shutil import copy, copytree
+
+from ventoy_macos.object import Object
+
+
+class Stub(Object):
+    """Easily stub objects."""
+
+    def __getattr(name: str):
+        """Return None for missing attributes."""
+        return None
 
 
 def copy_fixture(name: str, dest: Path) -> Path:

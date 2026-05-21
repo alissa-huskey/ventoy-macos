@@ -8,6 +8,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "3.11"
+attr = { git = "https://github.com/alissa-huskey/attr.git" }
 
 [tool.poetry.group.dev.dependencies]
 isort = "^8.0.1"

@@ -1,6 +1,6 @@
 from subprocess import CompletedProcess
 
-from ventoy_macos.common import b2s, has, run, s2b
+from ventoy_macos.common import b2s, run, s2b
 
 bp = breakpoint
 
@@ -11,11 +11,6 @@ def test_run():
     assert isinstance(result, CompletedProcess)
     assert result.returncode == 0
     assert result.stdout == "hello\n"
-
-
-def test_has():
-    assert has("xxx") is False
-    assert has("echo") is True
 
 
 def test_s2b():

@@ -5,12 +5,6 @@ import subprocess
 from ventoy_macos import SECTOR_SIZE, VentoyMacosError
 
 
-def has(cmd):
-    """Return True if command is found on the CLI."""
-    result = run(["command", "-v", cmd], check=False)
-    return result.returncode == 0
-
-
 def run(cmd, check=True, capture=True, timeout=30):
     """Run a command on the CLI."""
     result = subprocess.run(cmd, capture_output=capture, text=True, timeout=timeout)

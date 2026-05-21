@@ -1,4 +1,4 @@
-"""GPT construction."""
+"""Functions related to GPT construction."""
 
 import struct
 import uuid
