@@ -5,7 +5,6 @@ import subprocess
 import tempfile
 import urllib.request
 from argparse import Namespace
-from functools import cached_property
 from pathlib import Path
 from shutil import copy
 
@@ -35,16 +34,23 @@ class App(Object):
         self.args = args
         super().__init__(**kwargs)
 
-    @cached_property
+    @attr
     def workdir(self) -> Path:
-        """The directory to save and extract working files from."""
-        if self.args and self.args.work_dir:
-            workdir = Path(self.args.work_dir)
-            workdir.mkdir(exist_ok=True)
-        else:
-            workdir = tempfile.mkdtemp(prefix="ventoy-macos-")
-            workdir = Path(workdir)
-        return workdir
+        """Return the directory to save and extract working files from."""
+        if not self._workdir:
+            if self.args and self.args.work_dir:
+                workdir = Path(self.args.work_dir)
+                workdir.mkdir(exist_ok=True)
+            else:
+                workdir = tempfile.mkdtemp(prefix="ventoy-macos-")
+                workdir = Path(workdir)
+            self._workdir = workdir
+        return self._workdir
+
+    @workdir.setter
+    def workdir(self, value):
+        """Set the directory to save and extract working files from."""
+        self._workdir = Path(value)
 
     @attr(method="getter")
     def disk(self) -> Disk:
@@ -87,7 +93,7 @@ class App(Object):
         tag = data["tag_name"].lstrip("v")
         return tag
 
-    def download(self) -> str:
+    def download(self) -> Path:
         """Download the ventoy release return the tarball path."""
         tarball = f"ventoy-{self.version}-linux.tar.gz"
         url = (
@@ -100,23 +106,22 @@ class App(Object):
         if not dest.is_file():
             urllib.request.urlretrieve(url, str(dest))
 
-        self.tarball = str(dest)
+        self.tarball = dest
+        return self.tarball
 
-    def extract(self) -> str:
+    def extract(self) -> Path:
         """Extract `tarball` to `workdir` and set .ventoy_dir."""
         # extract the tarball
         run(["tar", "xzf", self.tarball, "-C", self.workdir])
 
-        path = Path(self.workdir)
-
-        if not path.is_dir():
-            raise VentoyMacosError(f"Not a valid directory: '{path}'")
+        if not self.workdir.is_dir():
+            raise VentoyMacosError(f"Not a valid directory: '{self.workdir}'")
 
         # find the extracted directory
-        for entry in path.iterdir():
+        for entry in self.workdir.iterdir():
             if entry.name.startswith("ventoy-") and entry.is_dir():
-                self.ventoy_dir = str(entry)
-                return
+                self.ventoy_dir = entry
+                return self.ventoy_dir
 
         # raise if not found
         raise VentoyMacosError("Could not find extracted Ventoy directory")
@@ -131,14 +136,11 @@ class App(Object):
         Returns:
             Paths to boot_img, core_img and disk_img
         """
-        ventoy_dir = Path(self.ventoy_dir)
-        workdir = Path(self.workdir)
+        if not self.ventoy_dir.is_dir():
+            raise VentoyMacosError(f"No such ventoy directory: '{self.ventoy_dir}'")
 
-        if not ventoy_dir.is_dir():
-            raise VentoyMacosError(f"No such ventoy directory: '{ventoy_dir}'")
-
-        if not workdir.is_dir():
-            raise VentoyMacosError(f"No such destination directory: '{workdir}'")
+        if not self.workdir.is_dir():
+            raise VentoyMacosError(f"No such destination directory: '{self.workdir}'")
 
         sources = [
             ("boot", "boot.img"),
@@ -146,7 +148,7 @@ class App(Object):
             ("ventoy", "ventoy.disk.img.xz"),
         ]
 
-        compressed = [Path(ventoy_dir, *parts) for parts in sources]
+        compressed = [Path(self.ventoy_dir, *parts) for parts in sources]
 
         for path in compressed:
             if not path.is_file():
@@ -154,7 +156,7 @@ class App(Object):
 
         decompressed = []
         for path in compressed:
-            dest = workdir / path.name.removesuffix(".xz")
+            dest = self.workdir / path.name.removesuffix(".xz")
             decompressed.append(dest)
 
             # if the source image is not compressed, just copy it

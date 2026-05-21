@@ -51,9 +51,9 @@ def test_decompress(tmp_path):
 
     app.decompress()
 
-    assert Path(app.boot_img).is_file()
-    assert Path(app.core_img).is_file()
-    assert Path(app.disk_img).is_file()
+    assert app.boot_img.is_file()
+    assert app.core_img.is_file()
+    assert app.disk_img.is_file()
 
 
 def test_app_download(tmp_path, monkeypatch):
@@ -78,10 +78,8 @@ def test_app_download(tmp_path, monkeypatch):
         app = App(version=version, workdir=tmp_path)
         app.download()
 
-        tarball = Path(app.tarball)
-
-        assert app.tarball == str(dest)
-        assert tarball.is_file() and tarball.read_text() == url
+        assert app.tarball == dest
+        assert app.tarball.is_file() and app.tarball.read_text() == url
 
 
 def test_app_extract(tmp_path):
@@ -95,7 +93,7 @@ def test_app_extract(tmp_path):
     app = App(tarball=tmp_tarball, workdir=str(tmp_path))
     app.extract()
 
-    assert app.ventoy_dir == str(path)
+    assert app.ventoy_dir == path
     assert path.is_dir()
 
 
@@ -116,6 +114,11 @@ def test_app_get_latest(monkeypatch):
         tag = app.get_latest()
 
         assert tag == "1.1.12"
+
+
+def test_app_workdir():
+    app = App(workdir="/tmp")
+    assert app.workdir == Path("/tmp")
 
 
 #  def test_app_():

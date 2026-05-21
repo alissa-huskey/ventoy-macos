@@ -1,10 +1,10 @@
-(A) 2026-05-19 @refactor Refactor disk.planned_layout
+(B) 2026-05-19 @refactor Refactor disk.planned_layout
 (C) 2026-05-19 @housekeeping Disk.format(): add test for fallback to diskutil
 (Z) 2026-05-20 @feature Add a list command to show USB devices.
-(C) 2026-05-20 @refactor Use Path objects everywhere instead of strings
 (Z) 2026-05-20 @feature Disk: Add .file_system
 (C) 2026-05-20 @feature add a --ventoy-dir and/or --tarball flag to allow the user to point to an existing download of ventoy if they have it.
 (C) 2026-05-20 @refactor Consider making a Image class (for boot.img, etc)
-(C) 2026-05-20 @task Ensure all of the printed messages from original are included.
+(A) 2026-05-20 @task Ensure all of the printed messages from original are included.
 2026-05-20 @bug Look at maybe broken test test_uuid_to_mixed_endian
 (C) 2026-05-20 @refactor Look for other instances of SECTOR_SIZE and see if you can replace with b2s() or s2b()
+(B) 2026-05-20 @refactor Move `to_gb() from Disk -> common
