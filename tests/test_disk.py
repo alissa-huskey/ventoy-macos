@@ -182,7 +182,7 @@ def test_disk_planned_layout(planned_layout, sectors_64g):
     ("92423", False),
 ])
 def test_disk_verify(monkeypatch, offset, is_correct):
-    info = {"Offset": offset}
+    info = {"PartitionMapPartitionOffset": offset}
 
     disk = Disk()
     with monkeypatch.context() as m:

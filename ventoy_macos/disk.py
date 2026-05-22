@@ -149,7 +149,7 @@ class Disk(Object):
 
     def verify(self) -> bool:
         """Verify the partition 1 offset."""
-        return self.info and "Offset" in self.info and self.info["Offset"] == "2048"
+        return self.info and self.info.get("PartitionMapPartitionOffset") == "2048"
 
     def mount(self):
         """Mount the disk."""

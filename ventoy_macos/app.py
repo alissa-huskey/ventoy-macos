@@ -64,8 +64,8 @@ class App(Object):
     def version(self) -> str:
         """Get the version attribute."""
         if not self._version:
-            if self.args and self.args.version:
-                self._version = self.args.version
+            if self.args and self.args.ventoy_version:
+                self._version = self.args.ventoy_version
             else:
                 self.version = self.get_latest()
         return self._version

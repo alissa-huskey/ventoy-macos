@@ -33,7 +33,7 @@ def test_app_disk():
 
 
 def test_app_version():
-    app = App(Stub(version="1.1.5"))
+    app = App(Stub(ventoy_version="1.1.5"))
 
     assert app.version == "1.1.5"
 
