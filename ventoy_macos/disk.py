@@ -1,12 +1,14 @@
 """Disk operations."""
 
+import plistlib
+import subprocess
 from functools import cached_property
 from pathlib import Path
 from re import compile as re_compile
 
 from ventoy_macos import SECTOR_SIZE as _SECTOR_SIZE
 from ventoy_macos import VentoyMacosError
-from ventoy_macos.common import run, s2g
+from ventoy_macos.common import b2s, run, s2g
 from ventoy_macos.object import Object
 from ventoy_macos.partition import Partition
 
@@ -60,8 +62,8 @@ class Disk(Object):
     def is_external(self) -> bool:
         """Return True if the disk is external."""
         return (
-            self.info.get("removable media", "").lower() == "removable" and
-            self.info.get("device location", "").lower() == "external"
+            self.info.get("Removable", False) and
+            not self.info.get("Internal", True)
         )
 
     @cached_property
@@ -70,28 +72,8 @@ class Disk(Object):
         if not self.exists():
             return
 
-        def _tr_key(key):
-            """Transform the key string."""
-            return key.lower().strip()
-
-        def _tr_value(value):
-            """Transform the value string."""
-            value = value.strip()
-            translations = {"Yes": True, "No": False}
-            return translations.get(value, value)
-
-        result = run(["diskutil", "info", self.device])
-        output = result.stdout
-
-        lines = [line.strip().split(":") for line in output.splitlines() if line]
-        data = {_tr_key(key): _tr_value(value) for key, value in lines}
-
-        apfs = data.pop("this disk is an apfs container.  apfs information", False)
-
-        if apfs == "":
-            apfs = True
-
-        data["is apfs container"] = apfs
+        raw = subprocess.check_output(["diskutil", "info", "-plist", self.device])
+        data = plistlib.loads(raw)
 
         return data
 
@@ -99,16 +81,12 @@ class Disk(Object):
     def sectors(self) -> int:
         """Return the disk size in 512-byte-units."""
         if not self._sectors:
-            if "disk size" not in self.info:
+            try:
+                self._sectors, _ = b2s(int(self.info["TotalSize"]))
+            # if the "Size" key is missing, or the value is not a valid int
+            except (KeyError, ValueError):
                 raise VentoyMacosError(f"Could not determine size of {self.device}")
 
-            match = self.SIZE_RE.search(self.info["disk size"])
-
-            if not match:
-                raise VentoyMacosError(f"Could not determine size of {self.device}")
-
-            total_bytes = int(match.group(1))
-            self._sectors = total_bytes // self.SECTOR_SIZE
         return self._sectors
 
     @sectors.setter
@@ -124,8 +102,20 @@ class Disk(Object):
     @property
     def current_layout(self):
         """Return the current partition layout."""
-        result = run(["diskutil", "list", self.device])
-        return result.stdout
+        raw = subprocess.check_output(["diskutil", "list", "-plist", self.device])
+        data = plistlib.loads(raw)
+        partitions = data["AllDisksAndPartitions"][0].get("Partitions")
+        layout = [
+            Partition(
+                number=i,
+                name=part.get("VolumeName", ""),
+                format=part.get("Content", ""),
+                identifier=part.get("DeviceIdentifier", ""),
+                bytes=part.get("Size", ""),
+            )
+            for i, part in enumerate(partitions, 1)
+        ]
+        return layout
 
     @cached_property
     def planned_layout(self):
@@ -159,7 +149,7 @@ class Disk(Object):
 
     def verify(self) -> bool:
         """Verify the partition 1 offset."""
-        return self.info and "offset" in self.info and self.info["offset"] == "2048"
+        return self.info and "Offset" in self.info and self.info["Offset"] == "2048"
 
     def mount(self):
         """Mount the disk."""

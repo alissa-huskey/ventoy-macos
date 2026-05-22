@@ -1,8 +1,10 @@
 import pytest
 
+from tests.data import diskutil_info_plist, diskutil_list_plist
 from ventoy_macos import disk as disk_module
 from ventoy_macos.disk import Disk
 from ventoy_macos.object import Object as Stub
+from ventoy_macos.partition import Partition
 
 bp = breakpoint
 
@@ -21,23 +23,65 @@ def test_disk():
     assert disk
 
 
-def test_disk_info():
-    disk = Disk("/dev/disk3")
-    info = disk.info
+def test_disk_info(monkeypatch):
+    expected = {
+        'Bootable': False,
+        'BusProtocol': 'USB',
+        'CanBeMadeBootable': False,
+        'CanBeMadeBootableRequiresDestroy': False,
+        'Content': 'FDisk_partition_scheme',
+        'DeviceBlockSize': 512,
+        'DeviceIdentifier': 'disk4',
+        'DeviceNode': '/dev/disk4',
+        'DeviceTreePath':
+            'IODeviceTree:/arm-io/usb-drd1@2280000/usb-drd1-port-hs@01100000',
+        'Ejectable': True,
+        'EjectableMediaAutomaticUnderSoftwareControl': True,
+        'EjectableOnly': True,
+        'FreeSpace': 0,
+        'GlobalPermissionsEnabled': False,
+        'IOKitSize': 8178892800,
+        'IORegistryEntryName': 'Generic Flash Disk Media',
+        'Internal': False,
+        'LowLevelFormatSupported': False,
+        'MediaName': 'Flash Disk',
+        'MediaType': 'Generic',
+        'MountPoint': '',
+        'OS9DriversInstalled': False,
+        'OSInternalMedia': False,
+        'ParentWholeDisk': 'disk4',
+        'PartitionMapPartition': False,
+        'RAIDMaster': False,
+        'RAIDSlice': False,
+        'Removable': True,
+        'RemovableMedia': True,
+        'RemovableMediaOrExternalDevice': True,
+        'SMARTDeviceSpecificKeysMayVaryNotGuaranteed': {},
+        'SMARTStatus': 'Not Supported',
+        'Size': 8178892800,
+        'SupportsGlobalPermissionsDisable': False,
+        'SystemImage': False,
+        'TotalSize': 8178892800,
+        'VirtualOrPhysical': 'Physical',
+        'VolumeName': '',
+        'VolumeSize': 0,
+        'WholeDisk': True,
+        'Writable': True,
+        'WritableMedia': True,
+        'WritableVolume': False
+    }
 
-    assert isinstance(info, dict)
+    with monkeypatch.context() as m:
+        m.setattr("subprocess.check_output", lambda args: diskutil_info_plist)
+        disk = Disk("/dev/disk3")
 
-    assert info["is apfs container"] is True
-    assert info["device identifier"] == "disk3"
-    assert info["device node"] == "/dev/disk3"
-
-    assert "disk size" in info
+        assert disk.info == expected
 
 
 def test_disk_sectors(monkeypatch):
-    info = {"disk size": "5.4 GB (5368664064 Bytes) (exactly 10485672 512-Byte-Units)"}
+    info = {"TotalSize": "5368664064"}
 
-    disk = Disk()
+    disk = Disk("/dev/disk4")
     with monkeypatch.context() as m:
         m.setattr(disk, "info", info)
 
@@ -54,8 +98,8 @@ def test_disk_exists(location, exists):
 
 
 @pytest.mark.parametrize(["info", "is_external"], [
-    ({"device location": "Internal", "removable media": "Fixed"}, False),
-    ({"device location": "External", "removable media": "removable"}, True),
+    ({"Internal": True, "Removable": False}, False),
+    ({"Internal": False, "Removable": True}, True),
 ])
 def test_disk_is_external(monkeypatch, info, is_external):
     disk = Disk()
@@ -99,7 +143,7 @@ def test_disk_raw_device():
 
 
 def test_disk_gb(monkeypatch):
-    info = {"disk size": "5.4 GB (5368664064 Bytes) (exactly 10485672 512-Byte-Units)"}
+    info = {"TotalSize": "5368664064"}
 
     disk = Disk()
     with monkeypatch.context() as m:
@@ -109,24 +153,21 @@ def test_disk_gb(monkeypatch):
 
 
 def test_disk_current_layout(monkeypatch):
-    layout = """
-/dev/disk3 (synthesized):
-   #:                       TYPE NAME                    SIZE       IDENTIFIER
-   0:      APFS Container Scheme -                      +2.0 TB     disk3
-                                 Physical Store disk0s2
-   1:                APFS Volume Macintosh HD            13.2 GB    disk3s1
-   2:              APFS Snapshot com.apple.os.update-... 13.2 GB    disk3s1s1
-   3:                APFS Volume Preboot                 12.5 GB    disk3s2
-   4:                APFS Volume Recovery                2.0 GB     disk3s3
-   5:                APFS Volume Data                    484.0 GB   disk3s5
-   6:                APFS Volume VM                      5.4 GB     disk3s6
-   7:                APFS Volume Nix Store               1.3 GB     disk3s7
-"""
-    disk = Disk()
+    expected = [
+        Partition(
+            number=1,
+            name="NO NAME",
+            format="DOS_FAT_32",
+            bytes=8173993984,
+            identifier="disk4s1",
+        ),
+    ]
+
+    disk = Disk("/dev/disk4")
 
     with monkeypatch.context() as m:
-        m.setattr(disk_module, "run", lambda args: Stub(stdout=layout))
-        assert disk.current_layout == layout
+        m.setattr("subprocess.check_output", lambda args: diskutil_list_plist)
+        assert disk.current_layout == expected
 
 
 def test_disk_planned_layout(planned_layout, sectors_64g):
@@ -141,7 +182,7 @@ def test_disk_planned_layout(planned_layout, sectors_64g):
     ("92423", False),
 ])
 def test_disk_verify(monkeypatch, offset, is_correct):
-    info = {"offset": offset}
+    info = {"Offset": offset}
 
     disk = Disk()
     with monkeypatch.context() as m:

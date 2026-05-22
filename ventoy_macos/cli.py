@@ -96,21 +96,43 @@ class CLI():
         print(f"Target disk: {self.disk.device}")
         print(f"Disk size: {self.disk.gb:.1f} GiB ({self.disk.sectors} sectors)")
 
-        # Show current layout
-        print("\nCurrent layout:")
-        print(self.disk.current_layout)
-
-        table = Table(
+        table_headers = (
             "#",
             "Name",
             "Format",
             "Size",
-            "Sectors",
-            title="Planned Ventoy layout"
         )
 
+        table_options = dict(
+            title_justify="left",
+            title_style="bold",
+        )
+
+        current = Table(
+            *table_headers,
+            "Identifier",
+            title="Current layout",
+            **table_options,
+        )
+
+        planned = Table(
+            *table_headers,
+            "Sectors",
+            title="Planned Ventoy layout",
+            **table_options,
+        )
+
+        for part in self.disk.current_layout:
+            current.add_row(
+                str(part.number),
+                part.name,
+                part.format,
+                size_text(part.sectors),
+                part.identifier,
+            )
+
         for part in self.disk.planned_layout:
-            table.add_row(
+            planned.add_row(
                 str(part.number),
                 part.name,
                 part.format,
@@ -118,7 +140,11 @@ class CLI():
                 f"[{part.start}-{part.start}]",
             )
 
-        rprint(table)
+        print()
+        rprint(current)
+
+        print()
+        rprint(planned)
         self.confirm("ALL DATA ON THIS DISK WILL BE DESTROYED. Continue?")
 
     def write_to_disk(self):
