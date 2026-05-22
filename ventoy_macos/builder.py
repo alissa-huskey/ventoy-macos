@@ -182,8 +182,7 @@ class Builder(Object):
     @require_fd
     def write_disk_img(self):
         """Write ventoy.disk.img to partition 2."""
-        part2_start = self.layout["part2_start"]
-        self.fd.write(s2b(part2_start), self.disk_img)
+        self.fd.write(s2b(self.layout[1].start), self.disk_img)
 
     @require_fd
     def write_disk_uuid(self):

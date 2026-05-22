@@ -48,8 +48,8 @@ def test_make_gpt_entry(planned_layout):
     entry = make_gpt_entry(
         GPT_BASIC_DATA_GUID,
         UUID('1894a02d-923e-4c79-b61f-d7f6dc2578ad'),
-        planned_layout["part1_start"],
-        planned_layout["part1_end"],
+        planned_layout[0].start,
+        planned_layout[0].end,
         0,
         "Ventoy",
     )
@@ -67,7 +67,7 @@ def test_make_crc(crc):
     assert result == crc
 
 
-def test_make_gpt_header(planned_layout, crc, header):
+def test_make_gpt_header(crc, header):
     disk_guid = UUID('62b5b82a-e930-4eb1-9aae-ba8b8d8d7de7')
     disk_sectors = 125000000
 

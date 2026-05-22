@@ -4,6 +4,7 @@ from string import ascii_lowercase
 import pytest
 
 from ventoy_macos.disk import Disk
+from ventoy_macos.partition import Partition
 
 
 @pytest.fixture
@@ -21,14 +22,22 @@ def fixtures_path() -> Path:
 @pytest.fixture
 def planned_layout():
     """Planned partition layout for a 64G drive."""
-    return {
-        "part1_start": 2048,
-        "part1_end": 124934423,
-        "part1_sectors": 124932376,
-        "part2_start": 124934424,
-        "part2_end": 124999959,
-        "part2_sectors": 65536,
-    }
+    return [
+        Partition(
+            number=1,
+            name="Ventoy",
+            format="exFAT",
+            start=2048,
+            end=124934423,
+        ),
+        Partition(
+            number=2,
+            name="VTOYEFI",
+            format="FAT16",
+            start=124934424,
+            end=124999959,
+        ),
+    ]
 
 
 @pytest.fixture

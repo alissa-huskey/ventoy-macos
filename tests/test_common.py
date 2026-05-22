@@ -1,6 +1,8 @@
 from subprocess import CompletedProcess
 
-from ventoy_macos.common import b2s, run, s2b
+import pytest
+
+from ventoy_macos.common import b2s, run, s2b, s2g, s2m, size_text
 
 bp = breakpoint
 
@@ -22,6 +24,22 @@ def test_s2b():
 def test_b2s():
     sectors = b2s(1152)
     assert sectors == (2, 128)
+
+
+def test_s2g():
+    assert s2g(10485672) == 4.999958038330078
+
+
+def test_s2m():
+    assert s2m(65536) == 31.25
+
+
+@pytest.mark.parametrize(["sectors", "expected"], [
+    (10485672, "5.0 GiB"),
+    (65536, "31 MiB"),
+])
+def test_size_text(sectors, expected):
+    assert size_text(sectors) == expected
 
 
 #  def test_():

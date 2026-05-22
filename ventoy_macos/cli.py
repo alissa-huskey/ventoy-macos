@@ -5,11 +5,16 @@ import os
 import sys
 import time
 
+from rich import print as rprint
+from rich.table import Table
+
 from ventoy_macos import VentoyMacosError
 from ventoy_macos.app import App
 from ventoy_macos.builder import Builder
-from ventoy_macos.common import run
+from ventoy_macos.common import run, size_text
 from ventoy_macos.disk import Disk
+
+bp = breakpoint
 
 
 class CLI():
@@ -47,7 +52,6 @@ class CLI():
     Examples:
         sudo ventoy-macos /dev/disk4
         sudo ventoy-macos /dev/disk4 --ventoy-version 1.1.10
-        sudo ventoy-macos /dev/disk4 --exfat
             """,
         )
         parser.add_argument("disk", help="Target disk device (e.g., /dev/disk4)")
@@ -96,21 +100,25 @@ class CLI():
         print("\nCurrent layout:")
         print(self.disk.current_layout)
 
-        # Calculate partition layout
-        layout = self.disk.planned_layout
-        p1_gb = self.disk.to_gb(layout["part1_sectors"])
-        p2_mb = self.disk.to_gb(layout["part2_sectors"])
+        table = Table(
+            "#",
+            "Name",
+            "Format",
+            "Size",
+            "Sectors",
+            title="Planned Ventoy layout"
+        )
 
-        print("\nPlanned Ventoy layout:")
-        print((
-            f"  Part 1 (Ventoy, exFAT):  {p1_gb:.1f} GiB  "
-            "[sectors {layout['part1_start']}-{layout['part1_end']}]"
-        ))
-        print((
-            f"  Part 2 (VTOYEFI, FAT16): {p2_mb:.0f} MiB   "
-            "[sectors {layout['part2_start']}-{layout['part2_end']}]"
-        ))
+        for part in self.disk.planned_layout:
+            table.add_row(
+                str(part.number),
+                part.name,
+                part.format,
+                size_text(part.sectors),
+                f"[{part.start}-{part.start}]",
+            )
 
+        rprint(table)
         self.confirm("ALL DATA ON THIS DISK WILL BE DESTROYED. Continue?")
 
     def write_to_disk(self):

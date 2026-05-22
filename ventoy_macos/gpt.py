@@ -67,16 +67,16 @@ def build_gpt(disk_sectors, layout):
     e1 = make_gpt_entry(
         GPT_BASIC_DATA_GUID,
         uuid.uuid4(),
-        layout["part1_start"],
-        layout["part1_end"],
+        layout[0].start,
+        layout[0].end,
         0,
         "Ventoy",
     )
     e2 = make_gpt_entry(
         GPT_BASIC_DATA_GUID,
         uuid.uuid4(),
-        layout["part2_start"],
-        layout["part2_end"],
+        layout[1].start,
+        layout[1].end,
         0,
         "VTOYEFI",
     )

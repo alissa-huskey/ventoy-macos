@@ -6,8 +6,9 @@ from re import compile as re_compile
 
 from ventoy_macos import SECTOR_SIZE as _SECTOR_SIZE
 from ventoy_macos import VentoyMacosError
-from ventoy_macos.common import run
+from ventoy_macos.common import run, s2g
 from ventoy_macos.object import Object
+from ventoy_macos.partition import Partition
 
 bp = breakpoint
 
@@ -115,14 +116,10 @@ class Disk(Object):
         """Set self.sectors."""
         self._sectors = value
 
-    def to_gb(self, sectors) -> float:
-        """Calculate GB size from sectors."""
-        return (sectors * self.SECTOR_SIZE) / (1024**3)
-
     @property
     def gb(self) -> float:
         """Return the disk size in GB."""
-        return self.to_gb(self.sectors)
+        return s2g(self.sectors)
 
     @property
     def current_layout(self):
@@ -133,25 +130,32 @@ class Disk(Object):
     @cached_property
     def planned_layout(self):
         """Calculate Ventoy-compatible partition layout."""
-        part1_start = 2048  # 1MB - Ventoy requirement
-        part1_end = self.sectors - self.SECTOR_NUM - 34
+        # partition for disk images
+        # total disk size minus ~32G for the Ventoy partition
+        part1 = Partition(
+            number=1,
+            name="Ventoy",
+            format="exFAT",
+            start=2048,   # 1MB - Ventoy requirement
+            end=(self.sectors - self.SECTOR_NUM - 34),
+        )
 
-        part2_start = part1_end + 1
-        mod = part2_start % 8
+        # bootable Ventoy partition
+        part2 = Partition(
+            number=2,
+            name="VTOYEFI",
+            format="FAT16",
+            start=part1.end + 1,
+        )
+
+        mod = part2.start % 8
         if mod > 0:
-            part1_end -= mod
-            part2_start = part1_end + 1
+            part1.end -= mod
+            part2.start = part1.end + 1
 
-        part2_end = part2_start + self.SECTOR_NUM - 1
+        part2.end = part2.start + self.SECTOR_NUM - 1
 
-        return {
-            "part1_start": part1_start,
-            "part1_end": part1_end,
-            "part1_sectors": part1_end - part1_start + 1,
-            "part2_start": part2_start,
-            "part2_end": part2_end,
-            "part2_sectors": part2_end - part2_start + 1,
-        }
+        return [part1, part2]
 
     def verify(self) -> bool:
         """Verify the partition 1 offset."""
