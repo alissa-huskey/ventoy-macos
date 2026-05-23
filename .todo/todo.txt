@@ -6,6 +6,5 @@
 2026-05-20 @bug Look at maybe broken test test_uuid_to_mixed_endian
 (B) 2026-05-23 @refactor Make my own alternate Theme since the rich one isn't working
 (Z) 2026-05-23 @feature Rule: Add title_style kwarg
-(A) 2026-05-23 @refactor CLI: Make a unified print_disk_layout function
 (B) 2026-05-23 @refactor Separate app.get_latest from app.get_ventoy so you can use a different status message.
 2026-05-23 Consider adding extra stuff that's not being printed to a log somewhere.

@@ -6,3 +6,4 @@ x 2026-05-21 2026-05-20 @refactor Move `to_gb() from Disk -> common
 x 2026-05-23 2026-05-21 verify that diskutil reports offset in info -plist correctly (after formatting)
 x 2026-05-23 2026-05-20 @task Ensure all of the printed messages from original are included.
 x 2026-05-23 2026-05-20 @refactor Look for other instances of SECTOR_SIZE and see if you can replace with b2s() or s2b()
+x 2026-05-23 2026-05-23 @refactor CLI: Make a unified print_disk_layout function

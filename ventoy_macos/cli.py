@@ -304,6 +304,43 @@ class CLI():
             **options,
         )
 
+    def disk_layout(
+        self,
+        title: str,
+        partitions: list,
+        headers: list = [],
+        func=None,
+        print: bool = False,
+    ) -> Panel:
+        """Return a panel that contains a disk layout table.
+
+        Arguments:
+            title (str): panel title
+            partitions (list[Partition]): list of partitions
+            header (list[str], optional): additional headers
+            func (callable, optional): function to return a list of the
+                additional values
+            print (bool, default=False): print immediately
+        """
+        common_headers = ("#", "Name", "Format", "Size")
+        table = self.table(
+            [
+                [
+                    str(part.number),
+                    part.name,
+                    part.format,
+                    size_text(part.sectors),
+                    *func(part),
+                ]
+                for part in partitions
+            ],
+            headers=([*common_headers, *headers]),
+        )
+        panel = self.panel(title, table)
+        if print:
+            self.print(panel)
+        return panel
+
     # ── Validation ───────────────────────────────────────────────────────
 
     def has(self, cmd: str) -> bool:
@@ -403,43 +440,21 @@ class CLI():
         )
         self.print(panel, before=1)
 
-        table_headers = (
-            "#",
-            "Name",
-            "Format",
-            "Size",
+        self.disk_layout(
+            "Current Layout",
+            self.disk.current_layout,
+            ["Identifier"],
+            lambda part: [part.identifier],
+            print=True,
         )
 
-        current = self.table(
-            [
-                [
-                    str(part.number),
-                    part.name,
-                    part.format,
-                    size_text(part.sectors),
-                    part.identifier,
-                ]
-                for part in self.disk.current_layout
-            ],
-            headers=(table_headers + ["Identifier"]),
+        self.disk_layout(
+            "Planned Layout",
+            self.disk.planned_layout,
+            ["Sectors"],
+            lambda part: [f"[{part.start}-{part.start}]"],
+            print=True
         )
-
-        planned = self.table(
-            [
-                [
-                    str(part.number),
-                    part.name,
-                    part.format,
-                    size_text(part.sectors),
-                    f"[{part.start}-{part.start}]",
-                ]
-                for part in self.disk.planned_layout
-            ],
-            headers=(table_headers + ["Sectors"]),
-        )
-
-        self.print(self.panel("Current Layout", current))
-        self.print(self.panel("Planned Layout", planned))
 
     def write_to_disk(self):
         """Write GPT and Ventoy boot code to the disk."""
@@ -527,24 +542,14 @@ class CLI():
             after=1,
         )
 
-        panel = self.panel(
-            "Ventoy Disk Layout",
-            current=self.table(
-                [
-                    [
-                        str(part.number),
-                        part.name,
-                        part.format,
-                        size_text(part.sectors),
-                        part.identifier,
-                    ]
-                    for part in self.disk.current_layout
-                ],
-                headers=["#", "Name", "Format", "Size", "Identifier"],
-            ),
+        self.disk_layout(
+            "New Disk Layout",
+            self.disk.current_layout,
+            ["Identifier"],
+            lambda part: [part.identifier],
+            print=True,
         )
 
-        self.print(panel)
         self.line(2)
 
         self.print(
