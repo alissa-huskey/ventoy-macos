@@ -8,7 +8,7 @@ from ventoy_macos.object import Object
 class Stub(Object):
     """Easily stub objects."""
 
-    def __getattr(name: str):
+    def __getattr__(self, name: str):
         """Return None for missing attributes."""
         return None
 

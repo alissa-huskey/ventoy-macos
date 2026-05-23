@@ -3,3 +3,4 @@ x 2026-05-20 2026-05-19 @refactor use `make_entries()` and `make_entries_cnc()` 
 x 2026-05-20 2026-05-20 @refactor Use Path objects everywhere instead of strings
 x 2026-05-21 2026-05-19 @refactor Refactor disk.planned_layout
 x 2026-05-21 2026-05-20 @refactor Move `to_gb() from Disk -> common
+x 2026-05-23 2026-05-21 verify that diskutil reports offset in info -plist correctly (after formatting)

@@ -29,6 +29,8 @@ class App(Object):
 
     REPO = "ventoy/Ventoy"
 
+    args = None
+
     def __init__(self, args: Namespace = None, **kwargs):
         """Initialize object."""
         self.args = args

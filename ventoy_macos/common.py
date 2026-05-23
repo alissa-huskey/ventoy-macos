@@ -7,9 +7,9 @@ from ventoy_macos import SECTOR_SIZE, VentoyMacosError
 bp = breakpoint
 
 
-def run(cmd, check=True, capture=True, timeout=30):
+def run(cmd, check=True, capture=True, text=True, timeout=30):
     """Run a command on the CLI."""
-    result = subprocess.run(cmd, capture_output=capture, text=True, timeout=timeout)
+    result = subprocess.run(cmd, capture_output=capture, text=text, timeout=timeout)
     if check and result.returncode != 0:
         stderr = result.stderr if capture else ""
         raise VentoyMacosError(f"Command failed: {' '.join(cmd)}\n{stderr}")

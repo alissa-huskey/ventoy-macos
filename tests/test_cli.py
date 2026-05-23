@@ -22,26 +22,25 @@ def test_cli_err(cli, capsys):
     assert "Goodbye" in output
 
 
-def test_cli_die(cli, capsys):
+def test_cli_abort(cli, capsys):
     with pytest.raises(SystemExit):
-        cli.die("Goodbye")
+        cli.abort("Goodbye")
 
 
-def test_cli_confirm_y(cli, monkeypatch):
+@pytest.mark.parametrize(["reply", "expected"], [
+    ("y", True),
+    ("Y", True),
+    ("n", False),
+    ("q", False),
+    ("yes", False),
+])
+def test_cli_confirm(cli, monkeypatch, reply, expected):
     with monkeypatch.context() as m:
-        m.setattr('builtins.input', lambda _: "y")
+        m.setattr('builtins.input', lambda *_: reply)
 
         result = cli.confirm("Continue?")
 
-        assert result is True
-
-
-def test_cli_confirm_n(cli, monkeypatch):
-    with monkeypatch.context() as m:
-        m.setattr('builtins.input', lambda _: "n")
-
-        with pytest.raises(SystemExit):
-            cli.confirm("Continue?")
+        assert result is expected
 
 
 def test_cli_has(cli):

@@ -38,7 +38,9 @@ def verify_attr(*attrs):
             for attr in attrs:
                 value = getattr(self, attr, None)
                 if not value:
-                    raise VentoyMacosError(f"Cannot write missing {attr} to disk.")
+                    raise VentoyMacosError(
+                        f"Unable to write {attr} to disk as the value is not set."
+                    )
             func(self)
         return wrapper
     return decorator
@@ -76,7 +78,7 @@ class Builder(Object):
             if self.images_path:
                 path = self.images_path / f"{name}.img"
                 if not path.is_file():
-                    raise VentoyMacosError(f"No such file: {path}")
+                    raise VentoyMacosError(f"No such image file: '{path}'")
                 image = path.read_bytes()
                 setattr(self, attr_name, image)
         return getattr(self, attr_name)
