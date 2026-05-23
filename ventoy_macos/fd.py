@@ -3,6 +3,7 @@
 import os
 
 from ventoy_macos import SECTOR_SIZE
+from ventoy_macos.common import s2b
 from ventoy_macos.disk import Disk
 from ventoy_macos.object import Object
 
@@ -59,7 +60,7 @@ class FD(Object):
 
     def patch(self, sector_num, offset, data):
         """Read-modify-write a sector to patch sub-sector bytes."""
-        sector_start = sector_num * SECTOR_SIZE
+        sector_start = s2b(sector_num)
         contents = bytearray(self.read(sector_start, SECTOR_SIZE))
         contents[offset: offset + len(data)] = data
         self.write(sector_start, bytes(contents))
