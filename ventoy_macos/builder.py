@@ -4,9 +4,13 @@ from os import urandom
 from time import sleep
 from uuid import uuid4
 
+from attr import attr, hasattrs
+
 from ventoy_macos import SECTOR_SIZE, VentoyMacosError
 from ventoy_macos.common import b2s, s2b
+from ventoy_macos.decorators import _private_setter, require_fd, verify_attr
 from ventoy_macos.disk import Disk
+from ventoy_macos.disk_image import DiskImage
 from ventoy_macos.fd import FD
 from ventoy_macos.object import Object
 from ventoy_macos.partialproperty import partialproperty
@@ -14,38 +18,7 @@ from ventoy_macos.partialproperty import partialproperty
 bp = breakpoint
 
 
-def require_fd(func):
-    """Return a decorator for methods that require an open FD."""
-
-    def wrapper(self):
-        """Ensure .disk exists and open self.fd if it is not already."""
-        if not self.disk:
-            raise VentoyMacosError("Cannot write to disk: no .disk attribute.")
-        if not (self.fd.is_open or self.fd.id):
-            self.fd.open()
-        func(self)
-    return wrapper
-
-
-def verify_attr(*attrs):
-    """Verify that an attribute is present and not null."""
-
-    def decorator(func):
-        """Return wrapper function."""
-
-        def wrapper(self):
-            """Ensure .disk exists and open self.fd if it is not already."""
-            for attr in attrs:
-                value = getattr(self, attr, None)
-                if not value:
-                    raise VentoyMacosError(
-                        f"Unable to write {attr} to disk as the value is not set."
-                    )
-            func(self)
-        return wrapper
-    return decorator
-
-
+@hasattrs
 class Builder(Object):
     """Bootable USB Builder."""
 
@@ -53,60 +26,77 @@ class Builder(Object):
     """Seconds to wait."""
 
     ATTRS = {
-        "images_path": None,
+        "disk": None,
         "mbr": None,
         "primary": None,
         "entries": None,
         "backup": None,
         "layout": None,
+        "images": {},
     }
 
-    _fd: FD = None
-    _boot_img: bytes = None
-    _core_img: bytes = None
-    _disk_img: bytes = None
+    _boot_img = None
+    _core_img = None
+    _disk_img = None
 
     def __init__(self, disk: Disk = None, **kwargs):
         """Initialize the object."""
         self.disk = disk
         super().__init__(**kwargs)
 
-    def _get_image_file(self, name: str) -> bytes:
-        """Read a image file."""
-        attr_name = f"_{name}_img"
-        if not getattr(self, attr_name, None):
-            if self.images_path:
-                path = self.images_path / f"{name}.img"
-                if not path.is_file():
-                    raise VentoyMacosError(f"No such image file: '{path}'")
-                image = path.read_bytes()
-                setattr(self, attr_name, image)
-        return getattr(self, attr_name)
+    def __repr__(self):
+        """Builder(disk='device')."""
+        text = ""
+        if (device := getattr(self.disk, "device", "")):
+            text = f"disk='{device}'"
 
-    def _set_image_file(self, value: bytes, name: str):
-        """Set an image file attribute."""
-        attr_name = f"_{name}_img"
-        setattr(self, attr_name, value)
+        return f"Builder({text})"
+
+    def _get_disk_image(self, name) -> DiskImage:
+        """Get the appropriate disk image from .images."""
+        # get the existing private disk image attribute
+        _name = f"_{name}"
+        img = getattr(self, _name)
+
+        # get the default image from .images
+        # and set the private attribute
+        if not img:
+            img = self.images.get(name)
+            if img:
+                setattr(self, _name, img)
+
+        if not img:
+            return
+
+        # make sure the value has a value for .data
+        if not getattr(img, "data", None):
+            raise VentoyMacosError(
+                f"Builder: The {name} DiskImage does not have any data. "
+                f"({type(img)}) {img}"
+            )
+
+        # return the img.data
+        return img.data
 
     boot_img = partialproperty(
-        getter=_get_image_file,
-        setter=_set_image_file,
-        name="boot"
+        getter=_get_disk_image,
+        setter=_private_setter,
+        name="boot_img",
     )
 
     core_img = partialproperty(
-        getter=_get_image_file,
-        setter=_set_image_file,
-        name="core",
+        getter=_get_disk_image,
+        setter=_private_setter,
+        name="core_img",
     )
 
     disk_img = partialproperty(
-        getter=_get_image_file,
-        setter=_set_image_file,
-        name="disk",
+        getter=_get_disk_image,
+        setter=_private_setter,
+        name="disk_img",
     )
 
-    @property
+    @attr
     def fd(self) -> FD:
         """Get the fd object."""
         if not self.disk:

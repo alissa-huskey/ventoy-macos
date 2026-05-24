@@ -7,3 +7,6 @@ x 2026-05-23 2026-05-21 verify that diskutil reports offset in info -plist corre
 x 2026-05-23 2026-05-20 @task Ensure all of the printed messages from original are included.
 x 2026-05-23 2026-05-20 @refactor Look for other instances of SECTOR_SIZE and see if you can replace with b2s() or s2b()
 x 2026-05-23 2026-05-23 @refactor CLI: Make a unified print_disk_layout function
+x 2026-05-24 2026-05-23 @refactor Separate app.get_latest from app.get_ventoy so you can use a different status message.
+x 2026-05-24 2026-05-23 @validation Check for validity of working dir earlier
+x 2026-05-24 2026-05-20 @refactor Consider making a Image class (for boot.img, etc)

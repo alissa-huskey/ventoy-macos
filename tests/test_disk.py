@@ -178,8 +178,9 @@ def test_disk_planned_layout(planned_layout, sectors_64g):
 
 
 @pytest.mark.parametrize(["offset", "is_correct"], [
-    ("2048", True),
-    ("92423", False),
+    (1048576, True),
+    ("1048576", False),
+    (92423, False),
 ])
 def test_disk_verify(monkeypatch, offset, is_correct):
     info = {"PartitionMapPartitionOffset": offset}

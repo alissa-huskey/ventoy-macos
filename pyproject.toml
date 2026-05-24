@@ -13,6 +13,7 @@ ventoy-macos = "ventoy_macos.cli:main"
 python = "3.11"
 attr = { git = "https://github.com/alissa-huskey/attr.git" }
 rich = "^15.0.0"
+requests = "^2.34.2"
 
 [tool.poetry.group.dev.dependencies]
 isort = "^8.0.1"

@@ -1,10 +1,9 @@
-from contextlib import contextmanager
-from io import StringIO
 from pathlib import Path
 
-from tests import Stub, copy_fixture
+from tests import Stub
 from ventoy_macos.app import App
 from ventoy_macos.disk import Disk
+from ventoy_macos.disk_image import DiskImage
 
 bp = breakpoint
 
@@ -38,87 +37,19 @@ def test_app_version():
     assert app.version == "1.1.5"
 
 
-def test_decompress(tmp_path):
-    """
-    GIVEN: An extracted ventoy directory
-    WHEN: decompress() is called with that directory and a destination path
-    THEN: the files boot.img, core.img and ventoy.disk.img should be created
-    """
-
-    tmp_ventoy_dir = copy_fixture("ventoy-1.1.12", tmp_path)
-
-    app = App(ventoy_dir=tmp_ventoy_dir, workdir=tmp_path)
-
-    app.decompress()
-
-    assert app.boot_img.is_file()
-    assert app.core_img.is_file()
-    assert app.disk_img.is_file()
-
-
-def test_app_download(tmp_path, monkeypatch):
-    """
-    WHEN: download() is called with a valid ventoy version number and directory
-    THEN: the ventoy release for that version should be downloaded to that directory
-    """
-
-    def urlretrieve(url, dest):
-        """Mock urllib.request.urlretrieve."""
-        path = Path(dest)
-        path.write_text(url)
-
-    with monkeypatch.context() as m:
-        m.setattr("urllib.request.urlretrieve", urlretrieve)
-
-        version = "1.1.11"
-        name = f"ventoy-{version}-linux.tar.gz"
-        url = f"https://github.com/ventoy/Ventoy/releases/download/v{version}/{name}"
-        dest = tmp_path / name
-
-        app = App(version=version, workdir=tmp_path)
-        app.download()
-
-        assert app.tarball == dest
-        assert app.tarball.is_file() and app.tarball.read_text() == url
-
-
-def test_app_extract(tmp_path):
-    """
-    WHEN: extract() is called with the path to a tarball and a destination path
-    THEN: it should extract the tarball to that destination directory
-    """
-    tmp_tarball = copy_fixture("ventoy-1.1.12.tar.gz", tmp_path)
-    path = tmp_path / "ventoy-1.1.12"
-
-    app = App(tarball=tmp_tarball, workdir=str(tmp_path))
-    app.extract()
-
-    assert app.ventoy_dir == path
-    assert path.is_dir()
-
-
-def test_app_get_latest(monkeypatch):
-    """
-    WHEN: get_latest() is called
-    THEN: it should return the latest ventoy release version.
-    """
-    @contextmanager
-    def urlopen(*args, **kwargs):
-        """Mock urlopen."""
-        yield StringIO('{"tag_name": "v1.1.12"}')
-
-    with monkeypatch.context() as m:
-        m.setattr("urllib.request.urlopen", urlopen)
-
-        app = App()
-        tag = app.get_latest()
-
-        assert tag == "1.1.12"
-
-
 def test_app_workdir():
     app = App(workdir="/tmp")
     assert app.workdir == Path("/tmp")
+
+
+def test_app_images(fixtures_path):
+    app = App(
+        downloader=Stub(ventoy_dir=(fixtures_path / "fake_images")),
+        workdir="/tmp"
+    )
+
+    assert len(app.images) == 3
+    assert all([isinstance(img, DiskImage) for img in app.images.values()])
 
 
 #  def test_app_():

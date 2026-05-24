@@ -1,11 +1,22 @@
 (C) 2026-05-19 @housekeeping Disk.format(): add test for fallback to diskutil
 (Z) 2026-05-20 @feature Add a list command to show USB devices.
 (Z) 2026-05-20 @feature Disk: Add .file_system
-(B) 2026-05-20 @feature add a --ventoy-dir and/or --tarball flag to allow the user to point to an existing download of ventoy if they have it.
-(A) 2026-05-20 @refactor Consider making a Image class (for boot.img, etc)
+x 2026-05-24 2026-05-20 @refactor Consider making a Image class (for boot.img, etc)
 2026-05-20 @bug Look at maybe broken test test_uuid_to_mixed_endian
 (B) 2026-05-23 @refactor Make my own alternate Theme since the rich one isn't working
 (Z) 2026-05-23 @feature Rule: Add title_style kwarg
-x 2026-05-23 2026-05-23 @refactor CLI: Make a unified print_disk_layout function
-(B) 2026-05-23 @refactor Separate app.get_latest from app.get_ventoy so you can use a different status message.
 2026-05-23 Consider adding extra stuff that's not being printed to a log somewhere.
+2026-05-23 @refactor rename workdir
+(A) 2026-05-23 @refactor Add some way to use last downloaded dir
+(B) 2026-05-23 Do chmod and chown on downloaded files and dir
+2026-05-23 Move .get_latest() from App.version to CLI so it can be wrapped in a .status() context manager
+(B) 2026-05-23 @quality run(): add error handling
+2026-05-23 @refactor Move partition1 definition from CLI -> Disk
+2026-05-23 Write real tests for CLI.
+(A) 2026-05-24 Verify that partition layouts are the same using the orig script.
+(B) 2026-05-24 Add --no-op mode (have FD and run() look at it, that should skip most operations I think)
+2026-05-24 Consider logging before/after disk .info and .current_layout
+2026-05-24 Add --pdb flag to enter debugger on exception
+2026-05-24 Maybe move .get_latest() out of Downloader(), since you can't access app.downloader without a version.
+2026-05-24 Add a message if you use the local files instead of downloading
+2026-05-24 Add used capacity to target disk info table

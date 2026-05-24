@@ -2,13 +2,25 @@ from uuid import UUID
 
 import pytest
 
+from tests import Stub
 from ventoy_macos import VentoyMacosError
 from ventoy_macos.builder import Builder
 from ventoy_macos.fd import FD
 
+# used to store mocked os.write calls
 DATA = []
 
 bp = breakpoint
+
+
+@pytest.fixture
+def disk_images():
+    """Return a mapping of DiskImage objects."""
+    return {
+        "boot_img": Stub(data=b"data"),
+        "core_img": Stub(data=b"data"),
+        "disk_img": Stub(data=b"data"),
+    }
 
 
 def os_write(fd_id: int, data: bytes):
@@ -35,31 +47,6 @@ def test_builder_fd():
 
     assert isinstance(builder.fd, FD)
     assert builder.fd.disk == builder.disk
-
-
-def test__get_image_file(fixtures_path):
-    path = fixtures_path / "fake_images"
-    builder = Builder(images_path=path)
-
-    img = builder._get_image_file("boot")
-    assert img == b"boot img\n"
-    assert builder._boot_img == img
-
-
-def test_builder_images(fixtures_path):
-    path = fixtures_path / "fake_images"
-    builder = Builder(images_path=path)
-
-    assert builder.boot_img and builder.boot_img == b"boot img\n"
-    assert builder.core_img and builder.core_img == b"core img\n"
-    assert builder.disk_img and builder.disk_img == b"disk img\n"
-
-
-def test_builder_image_setter():
-    builder = Builder()
-    builder.boot_img = b"set boot img"
-
-    assert builder.boot_img == b"set boot img"
 
 
 def test_builder_write_init_header(fake_disk, patch_os_write):
@@ -131,11 +118,15 @@ def test_builder_patchers(
     method,
     attr,
     matcher,
+    #  disk_images,
 ):
     fake_disk.sectors = sectors_64g
     params = {"layout": planned_layout}
+
+    # set the disk image stub
     if attr:
-        params[attr] = b"data"
+        params[attr] = Stub(data=b"data")
+
     builder = Builder(fake_disk, **params)
     func = getattr(builder, method)
     func()
@@ -191,6 +182,20 @@ def test_builder_write_disk_signature(fake_disk, patch_os_write):
     # I can't think of a way to test it, so for now
     # this just ensures there are no exceptions
     builder.write_disk_signature()
+
+
+def test_builder_images():
+    images = {
+        "boot_img": Stub(data=b"A"),
+        "core_img": Stub(data=b"B"),
+        "disk_img": Stub(data=b"C"),
+    }
+    builder = Builder(images=images)
+    builder.images == images
+
+    assert builder.boot_img == b"A"
+    assert builder.core_img == b"B"
+    assert builder.disk_img == b"C"
 
 
 #  def test_builder_():

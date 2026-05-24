@@ -5,9 +5,9 @@ from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 from bdb import BdbQuit
 from contextlib import contextmanager
 from os import geteuid
-from os.path import getsize
 from time import sleep
 
+from attr import attr, hasattrs
 from rich.align import Align
 from rich.console import Console, Group
 from rich.control import Control
@@ -20,9 +20,9 @@ from rich.traceback import install as rich_tracebacks
 
 from ventoy_macos import VentoyMacosError
 from ventoy_macos.app import App
-from ventoy_macos.builder import Builder
 from ventoy_macos.common import run, size_text
 from ventoy_macos.disk import Disk
+from ventoy_macos.downloader import Downloader
 from ventoy_macos.rule import Rule
 
 rich_tracebacks(show_locals=True)
@@ -30,21 +30,35 @@ rich_tracebacks(show_locals=True)
 bp = breakpoint
 
 
+@hasattrs
 class CLI():
     """Everything that prints or receives input from the user."""
-
-    console = Console(
-        emoji=True,
-        width=int(Console().width * 0.9),
-    )
 
     screen = Control()
 
     stderr = Console(stderr=True)
 
+    enable_interactive = None
+
     SECONDS = 1
 
     app = None
+
+    @attr
+    def console(self) -> Console:
+        """Return a console instance.
+
+        Stored here so that I can disable interactive mode based on --debug
+        flag (after object is already initialized) by nulling out ._console and
+        setting .enable_interactive to False.
+        """
+        if not self._console:
+            self._console = Console(
+                emoji=True,
+                width=int(Console().width * 0.9),
+                force_interactive=self.enable_interactive,
+            )
+        return self._console
 
     # ── Printing ─────────────────────────────────────────────────────────
 
@@ -98,7 +112,8 @@ class CLI():
         Returns:
             Align renderable (centered)
         """
-        icon = "[warning]:warning:[/warning]"
+        style = "#af0000 bold"
+        icon = f"[{style}]:warning:[/{style}]"
         message = Align(
             f"{icon} Warning: {message} {icon}",
             align="center",
@@ -188,10 +203,15 @@ class CLI():
             persist (bool, default=True): if the message should persist (by
                 printing a checkmark line to stdout after the task has completed)
         """
-        with self.console.status(f"{task}..."):
+        if not self.console.is_interactive:
+            self.print(f"  {task}...")
             yield
-            if persist:
-                self.print(f"[green]✔[/green] {task}")
+
+        else:
+            with self.console.status(f"{task}..."):
+                yield
+                if persist:
+                    self.print(f"[green]✔[/green] {task}")
 
     # ── Layout and Formattng ─────────────────────────────────────────────
 
@@ -383,8 +403,8 @@ class CLI():
 
     # ── Program Steps ────────────────────────────────────────────────────
 
-    def validate(self):
-        """Check system and disk requirements."""
+    def validate_sys(self):
+        """Check system requirements."""
         if geteuid() != 0:
             self.abort(
                 "This script must be run as root.",
@@ -401,6 +421,13 @@ class CLI():
                 "Install it with: brew install xz"
             )
 
+        if not self.app.workdir.is_dir():
+            self.abort(
+                f"Invalid working directory: {self.app.workdir}"
+            )
+
+    def validate_disk(self):
+        """Check disk requirements."""
         # disk must exist and start with /dev/disk
         if not self.disk.is_disk():
             self.abort(
@@ -426,11 +453,48 @@ class CLI():
                 prefix=":prohibited:",
             )
 
+    def get_ventoy(self):
+        """Download and extract Ventoy."""
+        self.print(self.header("Collecting Ventoy disk images"), before=1, after=1)
+
+        if not self.app.version:
+            if self.confirm("Request latest Ventoy release number?"):
+                with self.status("Fetching version", persist=False):
+                    self.app.version = Downloader().get_latest()
+            else:
+                self.print(
+                    "Ok. Use the --ventoy-version option next time.",
+                    padding=None,
+                    before=1,
+                )
+                exit()
+
+        downloader = self.app.downloader
+
+        if not self.confirm("Download Ventoy?", persist=False):
+            self.print(
+                "Ok. Next time use --work-dir to point to your local downloads.",
+                before=1,
+                padding=None,
+            )
+            exit()
+
+        with self.status(f"Downloading: {downloader.url}"):
+            downloader.download()
+
+        with self.status("Extracting Ventoy package"):
+            downloader.extract()
+
+        with self.status("Decompressing disk images"):
+            for img in self.app.images.values():
+                img.decompress()
+
     def show_disk_info(self):
         """Print the disk details and layout."""
         panel = self.panel(
             "Target disk",
             self.info_grid([
+                ("Name:", self.disk.info.get("MediaName", "")),
                 ("Location:", self.disk.device),
                 ("Disk size:", f"{self.disk.gb:.1f} GiB ({self.disk.sectors} sectors)")
             ]),
@@ -438,7 +502,7 @@ class CLI():
             self.warn("All data on this disk will be destroyed."),
             expand=False,
         )
-        self.print(panel, before=1)
+        self.print(panel)
 
         self.disk_layout(
             "Current Layout",
@@ -458,14 +522,7 @@ class CLI():
 
     def write_to_disk(self):
         """Write GPT and Ventoy boot code to the disk."""
-        builder = Builder(
-            self.app.disk,
-            mbr=self.app.mbr,
-            primary=self.app.primary,
-            entries=self.app.entries,
-            backup=self.app.backup,
-            images_path=self.app.workdir,
-        )
+        builder = self.app.builder
 
         with self.status("Unmounting disk"):
             builder.unmount()
@@ -498,7 +555,7 @@ class CLI():
                 builder.write_boot_img()
 
                 # GPT marker at offset 92
-                builder.write_gpt_marker(92, b"\x22")
+                builder.write_gpt_marker()
 
             with self.status("Writing core.img"):
                 # sectors 34-2047 (GPT gap area)
@@ -519,6 +576,23 @@ class CLI():
             with self.status("Finalizing all writes"):
                 builder.fd.save()
 
+    def format(self):
+        """Format partition 1.
+
+        NOTE: I believe this has to be done in a different function than
+        write_to_disk(). When I had it in the same function, it seemed that
+        macOS didn't finalize the writes untl the function completed, which
+        meant that the new partition scheme was not picked up.
+        """
+        with self.status("Waiting for macOS to detect partitions"):
+            self.pause(3)
+            disk = Disk(f"{self.disk.device}s1")
+            disk.unmount()
+
+        with self.status(f"Formatting {disk.device} as exFAT"):
+            self.pause(2)
+            disk.format()
+
     def verify(self):
         """Print final disk layout and verify partition 1 offset."""
         with self.status("Verifying disk", persist=False):
@@ -536,7 +610,7 @@ class CLI():
             )
 
         self.print(
-            ":star: Ventoy {self.app.version} installed successfully! :star:",
+            f":star: Ventoy {self.app.version} installed successfully! :star:",
             justify="center",
             before=1,
             after=1,
@@ -559,35 +633,47 @@ class CLI():
             style="dim",
         )
 
+    def show_ventoy_info(self):
+        """Print ventoy info panel."""
+        panel = self.panel(
+            "Ventoy",
+            self.info_grid([
+                ("Ventoy Version:", self.app.version),
+                ("Working Directory:", str(self.app.workdir)),
+                ("", ""),
+                ("Boot Images", ""),
+                *[
+                    (img.dest.path.name, f"{img.size} bytes")
+                    for img in self.app.images.values()
+                ],
+            ]),
+            expand=False,
+        )
+        self.print(panel, before=1)
+
     def run(self):
         """Run the CLI."""
         self.parse_args()
 
-        app = self.app = App(self.args)
-        self.disk = app.disk
+        self.app = App(self.args)
+        self.disk = self.app.disk
 
-        self.validate()
+        # disable interactive mode while in debug mode
+        # otherwise breakpionts cause problems
+        if self.app.args.debug:
+            self.enable_interactive = False
+            self.console = None
+
+        if self.app.args.debug:
+            self.console.force_interactive = False
+
+        self.validate_sys()
+
+        self.get_ventoy()
+        self.show_ventoy_info()
+
+        self.validate_disk()
         self.show_disk_info()
-
-        if not self.confirm("Download ventoy?", persist=False):
-            return
-
-        # Download and extract
-        with self.status("Downloading Ventoy", persist=False):
-            app.get_ventoy()
-
-        panel = self.panel(
-            "Build",
-            self.info_grid([
-                ("Ventoy version:", "1.1.12"),
-                ("Working directory:", "/tmp"),
-                *[
-                    (name, (getsize(getattr(self.app, name)) + " bytes"))
-                    for name, size in ["boot.img", "core.img", "ventoy.disk.img"]
-                ],
-            ]),
-        )
-        self.print(panel)
 
         self.print(
             self.warn("This is your last chance to abort."),
@@ -602,13 +688,12 @@ class CLI():
 
         # Build GPT
         with self.status("Building GPT partition table"):
-            app.build_gpt()
+            self.app.build_gpt()
 
         # Write everything
         self.write_to_disk()
 
-        # Format partition 1
-        self.format_partition1()
+        self.format()
 
         # Verify
         self.verify()
@@ -634,6 +719,6 @@ def main():
                 prefix=":collision:",
             )
 
-    # quit the debugger cleanly
-    except BdbQuit:
+    # clean exits
+    except (BdbQuit, KeyboardInterrupt):
         ...

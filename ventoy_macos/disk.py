@@ -8,7 +8,7 @@ from re import compile as re_compile
 
 from ventoy_macos import SECTOR_SIZE as _SECTOR_SIZE
 from ventoy_macos import VentoyMacosError
-from ventoy_macos.common import b2s, run, s2g
+from ventoy_macos.common import b2s, run, s2b, s2g
 from ventoy_macos.object import Object
 from ventoy_macos.partition import Partition
 
@@ -104,7 +104,7 @@ class Disk(Object):
         """Return the current partition layout."""
         raw = subprocess.check_output(["diskutil", "list", "-plist", self.device])
         data = plistlib.loads(raw)
-        partitions = data["AllDisksAndPartitions"][0].get("Partitions")
+        partitions = data["AllDisksAndPartitions"][0].get("Partitions", [])
         layout = [
             Partition(
                 number=i,
@@ -148,8 +148,8 @@ class Disk(Object):
         return [part1, part2]
 
     def verify(self) -> bool:
-        """Verify the partition 1 offset."""
-        return self.info and self.info.get("PartitionMapPartitionOffset") == "2048"
+        """Verify the partition 1 offset starts at sector 2048."""
+        return self.info and self.info.get("PartitionMapPartitionOffset") == s2b(2048)
 
     def mount(self):
         """Mount the disk."""
