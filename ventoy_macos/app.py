@@ -4,6 +4,7 @@ import tempfile
 from argparse import Namespace
 from os import chmod
 from pathlib import Path
+from stat import S_IMODE
 
 from attr import attr, hasattrs
 
@@ -32,7 +33,8 @@ class App(Object):
 
     REPO = "ventoy/Ventoy"
 
-    WRITE = 0o22  # go+w permissions
+    RW = 0o66  # go+rw permissions
+    RWX = 0o77
 
     IMAGES_RELDIRS = {
         "boot": ("boot", "boot.img"),
@@ -135,12 +137,29 @@ class App(Object):
                 self._version = self.args.ventoy_version
         return self._version
 
-    def chmod(self, dir: Path = None):
+    def chmod(self, path: Path = None):
         """Add write permissions to directory and all children recursively."""
-        dir = dir or self.workdir
+        path = path or self.workdir
 
-        for path in dir.iterdir():
-            current = path.stat().st_mode
-            chmod(path, current + self.WRITE)
-            if path.is_dir():
-                self.chmod(path)
+        # make always iterable
+        paths = [path]
+
+        if path.is_dir():
+            # add files in dir to iterable
+            paths += list(path.iterdir())
+
+        for file in paths:
+            # get the current mode
+            current = S_IMODE(file.stat().st_mode)
+
+            if file.is_dir():
+                new = current | self.RWX
+            else:
+                new = current | self.RW
+
+            # recursively chmod
+            if file != path and file.is_dir():
+                self.chmod(file)
+
+            # system chmod (go+rw)
+            chmod(file, new)

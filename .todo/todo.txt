@@ -20,9 +20,4 @@
 (A) 2026-05-24 Refactor to prepare full ventoy .img file on disk
 (A) 2026-05-25 protect against failed operations
 2026-05-25 Do the writes in a buffer, then write to disk at the end.
-2026-05-25 Write the .img files first, the partition table last.
-2026-05-25 Zero out 1st MB and GPT header area as the first step; on failure, tell the user install failed and the disk needs to be reformatted.
 2026-05-25 After failed install, offer to reformat the disk (diskutil eraseDisk ExFAT UNTITLED GPT /dev/disk4)
-2026-05-25 In FD._write(): Check os.write return value (bytes writte). If zero, raise an exception.
-2026-05-25 Wrap CLI.write_to_disk() in a try/except block.
-2026-05-25 FD.__exit__(): call .save() before .close()

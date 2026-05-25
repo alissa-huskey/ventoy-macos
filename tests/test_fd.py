@@ -8,14 +8,26 @@ bp = breakpoint
 
 
 @pytest.fixture
-def fd(fake_disk) -> FD:
+def fd(fake_disk, monkeypatch) -> FD:
     """Yield and open FD object then close it."""
     fd = FD(fake_disk)
-    fd.open()
+    fake_disk_os_write = os.write
 
-    yield fd
+    def mock_os_write(fd, data):
+        """Mock os.write.
 
-    fd.close()
+        The pyfakefs os.write returns None rather than an int representing the
+        number of bytes written. That return value is needed to verify that
+        writes were done correctly. (Outside of tests, but since the code is
+        there, the tests won't pass without this additional mock.)
+        """
+        fake_disk_os_write(fd, data)
+        return len(data)
+
+    with monkeypatch.context() as m:
+        m.setattr("os.write", mock_os_write)
+        with fd.open():
+            yield fd
 
 
 def test_fd():

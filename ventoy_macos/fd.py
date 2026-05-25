@@ -2,10 +2,12 @@
 
 import os
 
-from ventoy_macos import SECTOR_SIZE
+from ventoy_macos import SECTOR_SIZE, VentoyMacosError
 from ventoy_macos.common import s2b
 from ventoy_macos.disk import Disk
 from ventoy_macos.object import Object
+
+bp = breakpoint
 
 
 class FD(Object):
@@ -38,7 +40,12 @@ class FD(Object):
 
     def _write(self, data):
         """Write a bytes object to the file descriptor at the current position."""
-        os.write(self.id, data)
+        written = os.write(self.id, data)
+        expected = len(data)
+        if written != expected:
+            raise VentoyMacosError(
+                f"Expected {expected} bytes written, but actually wrote {written}."
+            )
 
     def write(self, position, data):
         """Set the position and write data to the file descriptor."""
@@ -71,5 +78,6 @@ class FD(Object):
 
     def __exit__(self, *args):
         """Close the file descriptor."""
+        self.save()
         self.close()
         return False

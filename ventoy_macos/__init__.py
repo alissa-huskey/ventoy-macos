@@ -12,3 +12,7 @@ class VentoyMacosError(Exception):
             setattr(self, k, v)
 
         super().__init__(*args)
+
+
+class VentoyMacosWriteError(VentoyMacosError):
+    """Failure during disk write operations."""

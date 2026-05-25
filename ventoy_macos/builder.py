@@ -122,6 +122,23 @@ class Builder(Object):
         sleep(self.PAUSE)
 
     @require_fd
+    def init(self):
+        """Zero first 1MB and the backup header location.
+
+        Puts the drive in a state where it will be recognizable by operating
+        systems as invalid. If the install fails, this is preferable to having
+        a half-installed drive, which an operating system may not know what to
+        do with. A obviously invalid drive can be recovered by
+        erasing/reformatting.
+
+        Upon successful completion of all writes, the drive will be in a valid
+        state.
+        """
+        self.write_init_header()
+        self.write_init_backup()
+        self.fd.save()
+
+    @require_fd
     def write_init_header(self):
         """Zero first 1MB (protective MBR + GPT header + entries area)."""
         self.fd.write(0, clear(s2b(2048)))

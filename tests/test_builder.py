@@ -26,6 +26,7 @@ def disk_images():
 def os_write(fd_id: int, data: bytes):
     """Mock os.write function."""
     DATA.append(data)
+    return len(data)
 
 
 @pytest.fixture

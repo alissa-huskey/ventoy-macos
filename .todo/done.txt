@@ -14,3 +14,8 @@ x 2026-05-24 2026-05-24 Add used capacity to target disk info table
 x 2026-05-24 2026-05-23 Move .get_latest() from App.version to CLI so it can be wrapped in a .status() context manager
 x 2026-05-24 2026-05-24 Add a message if you use the local files instead of downloading
 x 2026-05-24 2026-05-24 Maybe move .get_latest() out of Downloader(), since you can't access app.downloader without a version.
+x 2026-05-25 2026-05-25 Write the .img files first, the partition table last.
+x 2026-05-25 2026-05-25 Zero out 1st MB and GPT header area as the first step; on failure, tell the user install failed and the disk needs to be reformatted.
+x 2026-05-25 2026-05-25 In FD._write(): Check os.write return value (bytes writte). If zero, raise an exception.
+x 2026-05-25 2026-05-25 Wrap CLI.write_to_disk() in a try/except block.
+x 2026-05-25 2026-05-25 FD.__exit__(): call .save() before .close()

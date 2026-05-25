@@ -18,7 +18,7 @@ from rich.table import Table
 from rich.text import Text
 from rich.traceback import install as rich_tracebacks
 
-from ventoy_macos import VentoyMacosError
+from ventoy_macos import VentoyMacosError, VentoyMacosWriteError
 from ventoy_macos._exclude import EXCLUDE
 from ventoy_macos.app import App
 from ventoy_macos.common import b2s, run, size_text
@@ -436,7 +436,7 @@ class CLI():
         # disk must exist and start with /dev/disk
         if not self.disk.is_disk():
             self.abort(
-                f"Device not found or invalid: {self.disk}",
+                f"Device invalid or not mounted: {self.disk}",
                 '(Hint: must start with "/dev/disk".)'
             )
 
@@ -479,6 +479,7 @@ class CLI():
         # skip everything if there are already disk images
         if all([i.dest.exists() for i in self.app.images.values()]):
             self.done(f"Using Ventoy disk images in {self.app.workdir}")
+            self.app.chmod()
             return
 
         # if there's already a ventoy dir, skip to decompress
@@ -556,54 +557,75 @@ class CLI():
         with self.status("Unmounting disk"):
             builder.unmount()
 
-        with builder.fd.open():
-            # (protective MBR + GPT header + entries area)
-            with self.status("Zeroing first 1MB"):
-                builder.write_init_header()
+        try:
+            with builder.fd.open():
+                # ── Zero out the partition table headers and PMBR ───────────────────
+                # This puts the drive in a known invalid state.
 
-            with self.status("Zeroing backup GPT area"):
-                builder.write_init_backup()
+                with self.status("Initializing drive."):
+                    builder.init()
 
-            with self.status("Writing protective MBR"):
-                builder.write_mbr()
+                # ── Write disk images ────────────────────────────────────────────────
+                # These are the biggest writes and don't mess with the
+                # partition table.
 
-            # sector 1
-            with self.status("Writing primary GPT header"):
-                builder.write_primary_header()
+                with self.status("Writing core.img"):
+                    # sectors 34-2047 (GPT gap area)
+                    builder.write_core_img()
 
-            # sectors 2-33
-            with self.status("Writing GPT entries"):
-                builder.write_entries()
+                with self.status("Writing ventoy.disk.img to partition 2"):
+                    builder.write_disk_img()
 
-            # (+ header)
-            with self.status("Writing backup GPT"):
-                builder.write_backup()
+                # ── Write most of the partition table ────────────────────────────────
 
-            with self.status("Writing Ventoy boot.img"):
-                # 446 bytes of BIOS boot code to MBR
-                builder.write_boot_img()
+                with self.status("Writing GPT entries"):
+                    # sectors 2-33
+                    builder.write_entries()
 
-                # GPT marker at offset 92
-                builder.write_gpt_marker()
+                # offset 92
+                with self.status("Writing GPT marker"):
+                    builder.write_gpt_marker()
 
-            with self.status("Writing core.img"):
-                # sectors 34-2047 (GPT gap area)
-                builder.write_core_img()
+                # offset 17908
+                with self.status("Writing second GPT marker"):
+                    builder.write_second_gpt_marker()
 
-                # Second GPT marker at offset 17908
-                builder.write_second_gpt_marker()
+                # offset 384
+                with self.status("Writing disk UUID"):
+                    builder.write_disk_uuid()
 
-            with self.status("Writing ventoy.disk.img to partition 2"):
-                builder.write_disk_img()
+                # offset 440
+                with self.status("Writing disk signature"):
+                    builder.write_disk_signature()
 
-                # Disk UUID at offset 384
-                builder.write_disk_uuid()
+                with self.status("Writing protective MBR"):
+                    builder.write_mbr()
 
-                # Disk signature at offset 440
-                builder.write_disk_signature()
+                with self.status("Writing Ventoy boot.img"):
+                    # 446 bytes of BIOS boot code to MBR
+                    builder.write_boot_img()
 
-            with self.status("Finalizing all writes"):
-                builder.fd.save()
+                with self.status("Writing backup GPT"):
+                    builder.write_backup()
+
+                # ── Write partition table headers ────────────────────────────────────
+                # This puts the drive in a valid state.
+                #
+                # It is saved for last to reduce the chance of a failure during
+                # the write process leaving the drive recognizable as a
+                # GPT/Ventoy drive, but broken in an unpredictable way. An
+                # known and obvious invalid state is preferable, as it can
+                # dependably be recovered by erasing/formatting.
+
+                # sector 1
+                with self.status("Writing primary GPT header"):
+                    builder.write_primary_header()
+
+                with self.status("Finalizing all writes"):
+                    builder.fd.save()
+
+        except BaseException as e:
+            raise VentoyMacosWriteError("Install failed.", ex=e)
 
     def format(self):
         """Format partition 1.
@@ -619,7 +641,7 @@ class CLI():
             disk.unmount()
 
         with self.status(f"Formatting {disk.device} as exFAT"):
-            self.pause(2)
+            self.pause()
             disk.format()
 
     def verify(self):
@@ -733,6 +755,18 @@ def main():
         cli = CLI()
         cli.run()
 
+    except VentoyMacosError as e:
+        cli.line(2)
+        cli.err("Install failed.", str(e.ex), prefix=":collision:")
+        cli.line(1)
+
+        print(
+            f"The disk: {cli.disk.device} may not be formatted.",
+            "Strongly recommend erasing/formatting before use.",
+            sep="\n",
+        )
+
+        exit(1)
     except VentoyMacosError as e:
         if cli.app and cli.app.args and cli.app.args.debug:
             # print the traceback if in debug mode
