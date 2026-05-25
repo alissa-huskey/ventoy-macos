@@ -10,7 +10,7 @@ from ventoy_macos.builder import Builder
 from ventoy_macos.disk import Disk
 from ventoy_macos.disk_image import DiskImage
 from ventoy_macos.downloader import Downloader
-from ventoy_macos.gpt import build_gpt
+from ventoy_macos.gpt import GPT
 from ventoy_macos.object import Object
 
 bp = breakpoint
@@ -62,6 +62,16 @@ class App(Object):
         self._workdir = Path(value)
 
     @attr
+    def gpt(self) -> GPT:
+        """Return a GPT object."""
+        if not self.disk:
+            return
+
+        if not self._gpt:
+            self._gpt = GPT(self.disk.sectors, self.disk.planned_layout)
+        return self._gpt
+
+    @attr
     def downloader(self) -> Downloader:
         """Return a Downloader object."""
         if not self._downloader and (self.version and self.workdir):
@@ -77,11 +87,7 @@ class App(Object):
         if self.disk and not self._builder:
             self._builder = Builder(
                 self.disk,
-                mbr=self.mbr,
-                primary=self.primary,
-                entries=self.entries,
-                backup=self.backup,
-                layout=self.disk.planned_layout,
+                self.gpt,
                 images=self.images,
             )
         return self._builder
@@ -121,8 +127,3 @@ class App(Object):
             if self.args and self.args.ventoy_version:
                 self._version = self.args.ventoy_version
         return self._version
-
-    def build_gpt(self):
-        """Build the GPT partition table."""
-        objects = build_gpt(self.disk.sectors, self.disk.planned_layout)
-        self.mbr, self.primary, self.entries, self.backup = objects

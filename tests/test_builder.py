@@ -95,7 +95,7 @@ def test_builder_writers(fake_disk, patch_os_write, sectors_64g, method, attrs):
         attrs = (attrs,)
     kwargs = {name: b"data" for name in attrs}
     fake_disk.sectors = sectors_64g
-    builder = Builder(fake_disk, **kwargs)
+    builder = Builder(fake_disk, gpt=Stub(**kwargs))
     func = getattr(builder, method)
     func()
 
@@ -121,13 +121,13 @@ def test_builder_patchers(
     #  disk_images,
 ):
     fake_disk.sectors = sectors_64g
-    params = {"layout": planned_layout}
 
     # set the disk image stub
+    params = {}
     if attr:
         params[attr] = Stub(data=b"data")
 
-    builder = Builder(fake_disk, **params)
+    builder = Builder(fake_disk, gpt=Stub(layout=planned_layout), **params)
     func = getattr(builder, method)
     func()
 
@@ -196,6 +196,18 @@ def test_builder_images():
     assert builder.boot_img == b"A"
     assert builder.core_img == b"B"
     assert builder.disk_img == b"C"
+
+
+@pytest.mark.parametrize("attr", [
+    "mbr",
+    "primary",
+    "entries",
+    "backup",
+    "layout",
+])
+def test_builder_from_gpt(attr):
+    builder = Builder(gpt=Stub(mbr=b"data"))
+    getattr(builder, attr) == b"data"
 
 
 #  def test_builder_():

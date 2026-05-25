@@ -1,5 +1,6 @@
 """Decorators and partialproperty methods."""
 
+import uuid
 from functools import wraps
 
 from ventoy_macos import VentoyMacosError
@@ -54,3 +55,24 @@ def verify_attr(*attrs):
             func(self)
         return wrapper
     return decorator
+
+
+def _get_cached_uuid(self, name):
+    """Get a UUID and cache it.
+
+    Intended to be used as a partial() with attr().
+
+    Example:
+        from attrs import attr, hasattrs
+        from ventoy_macos.decorators import _get_cached_uuid
+
+        @hasattrs
+        class Thing:
+            id = attr("id", getter=partial(_get_cached_uuid, name="id"))
+    """
+    attr_name = f"_{name}"
+    value = getattr(self, attr_name, None)
+    if not value:
+        value = uuid.uuid4()
+        setattr(self, attr_name, value)
+    return value

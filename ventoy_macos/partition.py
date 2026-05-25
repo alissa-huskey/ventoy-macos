@@ -19,6 +19,7 @@ class Partition(Object):
         "identifier": None,
         "start": None,
         "end": None,
+        "disk": None,
     }
 
     @attr

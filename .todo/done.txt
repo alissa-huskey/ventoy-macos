@@ -10,3 +10,4 @@ x 2026-05-23 2026-05-23 @refactor CLI: Make a unified print_disk_layout function
 x 2026-05-24 2026-05-23 @refactor Separate app.get_latest from app.get_ventoy so you can use a different status message.
 x 2026-05-24 2026-05-23 @validation Check for validity of working dir earlier
 x 2026-05-24 2026-05-20 @refactor Consider making a Image class (for boot.img, etc)
+x 2026-05-24 2026-05-24 Add used capacity to target disk info table

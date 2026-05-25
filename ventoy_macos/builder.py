@@ -1,5 +1,6 @@
 """Bootable USB Builder."""
 
+from functools import partial
 from os import urandom
 from time import sleep
 from uuid import uuid4
@@ -12,6 +13,7 @@ from ventoy_macos.decorators import _private_setter, require_fd, verify_attr
 from ventoy_macos.disk import Disk
 from ventoy_macos.disk_image import DiskImage
 from ventoy_macos.fd import FD
+from ventoy_macos.gpt import clear
 from ventoy_macos.object import Object
 from ventoy_macos.partialproperty import partialproperty
 
@@ -27,11 +29,7 @@ class Builder(Object):
 
     ATTRS = {
         "disk": None,
-        "mbr": None,
-        "primary": None,
-        "entries": None,
-        "backup": None,
-        "layout": None,
+        "gpt": None,
         "images": {},
     }
 
@@ -51,6 +49,18 @@ class Builder(Object):
             text = f"disk='{device}'"
 
         return f"Builder({text})"
+
+    def _get_from_gpt(self, attr):
+        """Get an attribute from .gpt."""
+        if not self.gpt:
+            return
+        return getattr(self.gpt, attr, None)
+
+    mbr = attr("mbr", getter=partial(_get_from_gpt, attr="mbr"))
+    primary = attr("primary", getter=partial(_get_from_gpt, attr="primary"))
+    entries = attr("entries", getter=partial(_get_from_gpt, attr="entries"))
+    backup = attr("backup", getter=partial(_get_from_gpt, attr="backup"))
+    layout = attr("layout", getter=partial(_get_from_gpt, attr="layout"))
 
     def _get_disk_image(self, name) -> DiskImage:
         """Get the appropriate disk image from .images."""
@@ -115,14 +125,14 @@ class Builder(Object):
     @require_fd
     def write_init_header(self):
         """Zero first 1MB (protective MBR + GPT header + entries area)."""
-        self.fd.write(0, b"\x00" * s2b(2048))
+        self.fd.write(0, clear(s2b(2048)))
 
     @require_fd
     def write_init_backup(self):
         """Zero backup GPT area."""
         self.fd.write(
             s2b(self.disk.sectors - 33),
-            b"\x00" * s2b(33)
+            clear(s2b(33)),
         )
 
     @verify_attr("mbr")
@@ -167,7 +177,7 @@ class Builder(Object):
         """Write core.img."""
         core = self.core_img[: s2b(2014)]
         if len(core) % SECTOR_SIZE:
-            core += b"\x00" * (SECTOR_SIZE - len(core) % SECTOR_SIZE)
+            core += clear((SECTOR_SIZE - len(core) % SECTOR_SIZE))
         self.fd.write(s2b(34), core)
 
     @verify_attr("disk_img", "layout")

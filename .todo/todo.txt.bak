@@ -1,7 +1,6 @@
 (C) 2026-05-19 @housekeeping Disk.format(): add test for fallback to diskutil
 (Z) 2026-05-20 @feature Add a list command to show USB devices.
 (Z) 2026-05-20 @feature Disk: Add .file_system
-x 2026-05-24 2026-05-20 @refactor Consider making a Image class (for boot.img, etc)
 2026-05-20 @bug Look at maybe broken test test_uuid_to_mixed_endian
 (B) 2026-05-23 @refactor Make my own alternate Theme since the rich one isn't working
 (Z) 2026-05-23 @feature Rule: Add title_style kwarg
@@ -19,4 +18,6 @@ x 2026-05-24 2026-05-20 @refactor Consider making a Image class (for boot.img, e
 2026-05-24 Add --pdb flag to enter debugger on exception
 2026-05-24 Maybe move .get_latest() out of Downloader(), since you can't access app.downloader without a version.
 2026-05-24 Add a message if you use the local files instead of downloading
-2026-05-24 Add used capacity to target disk info table
+2026-05-24 Partition: refactor to store all diskutil list info and use properties/attrs
+2026-05-24 Add a Layout/Table/Partitions class
+2026-05-24 Rename sector -> block

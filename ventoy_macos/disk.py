@@ -70,7 +70,7 @@ class Disk(Object):
     def info(self) -> dict:
         """Return the diskutil info."""
         if not self.exists():
-            return
+            return {}
 
         raw = subprocess.check_output(["diskutil", "info", "-plist", self.device])
         data = plistlib.loads(raw)
@@ -105,16 +105,24 @@ class Disk(Object):
         raw = subprocess.check_output(["diskutil", "list", "-plist", self.device])
         data = plistlib.loads(raw)
         partitions = data["AllDisksAndPartitions"][0].get("Partitions", [])
-        layout = [
-            Partition(
+        layout = []
+
+        for i, part in enumerate(partitions, 1):
+            id = part.get("DeviceIdentifier", "")
+            disk = self.__class__(f"/dev/{part.get('DeviceIdentifier', '')}")
+
+            obj = Partition(
                 number=i,
                 name=part.get("VolumeName", ""),
-                format=part.get("Content", ""),
-                identifier=part.get("DeviceIdentifier", ""),
+                format=disk.info.get(
+                    "FilesystemUserVisibleName",
+                    part.get("Content", ""),
+                ),
+                identifier=id,
                 bytes=part.get("Size", ""),
+                disk=disk,
             )
-            for i, part in enumerate(partitions, 1)
-        ]
+            layout.append(obj)
         return layout
 
     @cached_property
@@ -138,6 +146,7 @@ class Disk(Object):
             start=part1.end + 1,
         )
 
+        # jump back to the start of the byte
         mod = part2.start % 8
         if mod > 0:
             part1.end -= mod

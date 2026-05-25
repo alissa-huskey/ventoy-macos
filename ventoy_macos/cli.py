@@ -20,7 +20,7 @@ from rich.traceback import install as rich_tracebacks
 
 from ventoy_macos import VentoyMacosError
 from ventoy_macos.app import App
-from ventoy_macos.common import run, size_text
+from ventoy_macos.common import b2s, run, size_text
 from ventoy_macos.disk import Disk
 from ventoy_macos.downloader import Downloader
 from ventoy_macos.rule import Rule
@@ -495,6 +495,7 @@ class CLI():
             "Target disk",
             self.info_grid([
                 ("Name:", self.disk.info.get("MediaName", "")),
+                ("Partition Scheme:", self.disk.info.get("Content", "")),
                 ("Location:", self.disk.device),
                 ("Disk size:", f"{self.disk.gb:.1f} GiB ({self.disk.sectors} sectors)")
             ]),
@@ -507,8 +508,11 @@ class CLI():
         self.disk_layout(
             "Current Layout",
             self.disk.current_layout,
-            ["Identifier"],
-            lambda part: [part.identifier],
+            ["Free", "Identifier"],
+            lambda part: [
+                size_text(b2s(part.disk.info.get("FreeSpace"))[0]),
+                part.identifier,
+            ],
             print=True,
         )
 
@@ -685,10 +689,6 @@ class CLI():
             return
 
         self.print(self.header("Building Ventoy disk"), before=1, after=1)
-
-        # Build GPT
-        with self.status("Building GPT partition table"):
-            self.app.build_gpt()
 
         # Write everything
         self.write_to_disk()

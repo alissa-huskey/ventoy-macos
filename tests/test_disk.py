@@ -159,11 +159,12 @@ def test_disk_current_layout(monkeypatch):
             name="NO NAME",
             format="DOS_FAT_32",
             bytes=8173993984,
-            identifier="disk4s1",
+            identifier="disk8s1",
+            disk=Disk("/dev/disk8s1", info={}),
         ),
     ]
 
-    disk = Disk("/dev/disk4")
+    disk = Disk("/dev/disk8")
 
     with monkeypatch.context() as m:
         m.setattr("subprocess.check_output", lambda args: diskutil_list_plist)

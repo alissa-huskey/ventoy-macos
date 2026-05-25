@@ -2,7 +2,7 @@ from subprocess import CompletedProcess
 
 import pytest
 
-from ventoy_macos.common import b2s, run, s2b, s2g, s2m, size_text
+from ventoy_macos.common import b2s, clear, run, s2b, s2g, s2m, size_text
 
 bp = breakpoint
 
@@ -40,6 +40,15 @@ def test_s2m():
 ])
 def test_size_text(sectors, expected):
     assert size_text(sectors) == expected
+
+
+@pytest.mark.parametrize(["args", "expected"], [
+    ([20], b"\x00" * 20),
+    ([20, b"prefix"], b"prefix" + (b"\x00" * 14)),
+])
+def test_clear(args, expected):
+    result = clear(*args)
+    assert result == expected
 
 
 #  def test_():

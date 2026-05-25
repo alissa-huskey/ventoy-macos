@@ -48,3 +48,15 @@ def size_text(sectors: int) -> str:
         units = "MiB"
 
     return f"{value:.{prec}f} {units}"
+
+
+def clear(size: int, prefix: bytes = b"") -> bytes:
+    r"""Return a sequence of zero bytes to clear out a certain amount of space.
+
+    Arguments:
+        - size (int): size of space in bytes
+        - prefix (bytes, default=b""): data to prepend to prepend (and subtract
+            its length from zeros length)
+    """
+    empty = b"\x00" * (size - len(prefix))
+    return prefix + empty

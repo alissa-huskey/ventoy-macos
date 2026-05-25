@@ -1,118 +1,186 @@
-"""Functions related to GPT construction."""
+"""Functions related to GUID Partition Table (GPT) construction."""
 
 import struct
 import uuid
 import zlib
+from functools import cached_property, partial
 
-from ventoy_macos import SECTOR_SIZE
+from attr import attr, hasattrs
 
-GPT_BASIC_DATA_GUID = uuid.UUID("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7")
+from ventoy_macos import SECTOR_SIZE, VentoyMacosError
+from ventoy_macos.common import clear
+from ventoy_macos.decorators import _get_cached_uuid
+from ventoy_macos.object import Object
 
 bp = breakpoint
 
 
-def make_entries(e1, e2):
-    """Combine e1 and e2."""
-    return e1 + e2 + b"\x00" * (128 * 128 - 256)
+@hasattrs
+class GPT(Object):
+    """Functions related to GUID Partition Table (GPT) construction."""
 
+    # partition type
+    GPT_BASIC_DATA_GUID = uuid.UUID("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7")
 
-def make_crc(data):
-    """Make crc."""
-    return zlib.crc32(data) & 0xFFFFFFFF
+    PARTITION_START_LBA = 2048
 
+    ENTRY_SIZE = 128
 
-def uuid_to_mixed_endian(u):
-    """Convert a UUID to mixed endian."""
-    b = u.bytes
-    return b[3::-1] + b[5:3:-1] + b[7:5:-1] + b[8:16]
+    ENTRY_COUNT = 128
 
+    def __init__(self, sectors: int = None, layout: list = [], **kwargs):
+        """Initialize."""
+        self.sectors = sectors
+        self.layout = layout
 
-def make_gpt_entry(type_guid, unique_guid, start, end, attrs, name):
-    """Make a GPT entry."""
-    t = uuid_to_mixed_endian(type_guid)
-    u = uuid_to_mixed_endian(unique_guid)
-    n = name.encode("utf-16-le")
-    n += b"\x00" * (72 - len(n))
-    return struct.pack("<16s16sQQQ72s", t, u, start, end, attrs, n)
+        super().__init__(**kwargs)
 
+    guid = attr("guid", getter=partial(_get_cached_uuid, name="guid"))
+    e1_uuid = attr("e1_uuid", getter=partial(_get_cached_uuid, name="e1_uuid"))
+    e2_uuid = attr("e2_uuid", getter=partial(_get_cached_uuid, name="e2_uuid"))
 
-def make_gpt_header(params):
-    """Make GPT header."""
-    data = struct.pack(
-        "<8sIIIIQQQQ16sQIII",
-        b"EFI PART",
-        0x00010000,
-        92,
-        0,  # CRC placeholder
-        0,
-        params["my_lba"],
-        params["alt_lba"],
-        params["first_usable"],
-        params["last_usable"],
-        uuid_to_mixed_endian(params["disk_guid"]),
-        params["entry_start"],
-        params["num_entries"],
-        params["entry_size"],
-        params["entries_crc"],
-    )
-    crc = make_crc(data)
-    data = data[:16] + struct.pack("<I", crc) + data[20:]
-    return data + b"\x00" * (SECTOR_SIZE - len(data))
+    def to_le(self, u: uuid.UUID) -> bytes:
+        """Convert a UUID to little endian.
 
+        (Reverse the byte order.)
+        """
+        b = u.bytes
+        return b[3::-1] + b[5:3:-1] + b[7:5:-1] + b[8:16]
 
-def build_gpt(disk_sectors, layout):
-    """Build complete GPT structures."""
-    disk_guid = uuid.uuid4()
+    @property
+    def last_usable(self) -> int:
+        """Return the last usable LBA (for partitions)."""
+        if not self.sectors:
+            raise VentoyMacosError("GPT.last_usable: .sectors not defined")
+        return self.sectors - 34
 
-    e1 = make_gpt_entry(
-        GPT_BASIC_DATA_GUID,
-        uuid.uuid4(),
-        layout[0].start,
-        layout[0].end,
-        0,
-        "Ventoy",
-    )
-    e2 = make_gpt_entry(
-        GPT_BASIC_DATA_GUID,
-        uuid.uuid4(),
-        layout[1].start,
-        layout[1].end,
-        0,
-        "VTOYEFI",
-    )
-    entries = make_entries(e1, e2)
-    entries_crc = make_crc(entries)
+    def make_checksum(self, data: bytes) -> bytes:
+        """Generate CRC-32 checksum."""
+        return zlib.crc32(data) & 0xFFFFFFFF
 
-    common = {
-        "disk_guid": disk_guid,
-        "first_usable": 2048,
-        "last_usable": disk_sectors - 34,
-        "num_entries": 128,
-        "entry_size": 128,
-        "entries_crc": entries_crc,
-    }
+    @property
+    def mbr(self) -> bytes:
+        """Make protective MBR."""
+        if not self.sectors:
+            raise VentoyMacosError("GPT.mbr: .sectors not defined")
+        mbr = bytearray(512)
+        mbr[446:447] = b"\x00"
+        mbr[448] = 0x02
+        mbr[450] = 0xEE
+        mbr[451] = mbr[452] = mbr[453] = 0xFF
+        struct.pack_into("<I", mbr, 454, 1)
+        struct.pack_into("<I", mbr, 458, min(self.sectors - 1, 0xFFFFFFFF))
+        mbr[510] = 0x55
+        mbr[511] = 0xAA
+        return mbr
 
-    primary = make_gpt_header(
-        {**common, "my_lba": 1, "alt_lba": disk_sectors - 1, "entry_start": 2}
-    )
-    backup = make_gpt_header(
-        {
-            **common,
-            "my_lba": disk_sectors - 1,
-            "alt_lba": 1,
-            "entry_start": disk_sectors - 33,
-        }
-    )
+    @cached_property
+    def e1(self) -> bytes:
+        """Return the entry for partition 1."""
+        if not self.layout:
+            raise VentoyMacosError("GPT.e1: .layout not defined")
 
-    # Protective MBR
-    mbr = bytearray(512)
-    mbr[446:447] = b"\x00"
-    mbr[448] = 0x02
-    mbr[450] = 0xEE
-    mbr[451] = mbr[452] = mbr[453] = 0xFF
-    struct.pack_into("<I", mbr, 454, 1)
-    struct.pack_into("<I", mbr, 458, min(disk_sectors - 1, 0xFFFFFFFF))
-    mbr[510] = 0x55
-    mbr[511] = 0xAA
+        return self.make_entry(
+            self.layout[0].start,
+            self.layout[0].end,
+            "Ventoy",
+            self.e1_uuid,
+        )
 
-    return bytes(mbr), primary, entries, backup
+    @cached_property
+    def e2(self) -> bytes:
+        """Return the entry for partition 2."""
+        if not self.layout:
+            raise VentoyMacosError("GPT.e2: .layout not defined")
+
+        return self.make_entry(
+            self.layout[1].start,
+            self.layout[1].end,
+            "VTOYEFI",
+            self.e2_uuid,
+        )
+
+    @cached_property
+    def entries(self):
+        """Return the entries."""
+        if not (self.e1 and self.e2):
+            raise VentoyMacosError("GPT.entries: .e1 and .e2 must be defined")
+        return self.e1 + self.e2 + clear((self.ENTRY_SIZE * self.ENTRY_COUNT) - 256)
+
+    @cached_property
+    def primary(self) -> bytes:
+        """Return the primary header."""
+        if not self.sectors:
+            raise VentoyMacosError("GPT.primary: .sectors not defined")
+        return self.make_header(
+            lba=1,
+            alt_lba=self.sectors - 1,
+            entry_start=2,
+        )
+
+    @cached_property
+    def backup(self) -> bytes:
+        """Return the backup header."""
+        if not self.sectors:
+            raise VentoyMacosError("GPT.backup: .sectors not defined")
+        return self.make_header(
+            lba=self.sectors - 1,
+            alt_lba=1,
+            entry_start=self.sectors - 33,
+        )
+
+    @cached_property
+    def entries_crc(self) -> int:
+        """Return the CRC-32 checksum for self.entries."""
+        return self.make_checksum(self.entries)
+
+    def make_entry(
+        self,
+        start: int,
+        end: int,
+        name: str,
+        id: uuid.UUID,
+        attrs: bytes = 0,
+    ) -> bytes:
+        """Make a GPT entry."""
+        n = name.encode("utf-16-le")
+
+        entry = struct.pack(
+            "<16s16sQQQ72s",
+            self.to_le(self.GPT_BASIC_DATA_GUID),
+            self.to_le(id),
+            start,
+            end,
+            attrs,
+            clear(72, n),
+        )
+        return entry
+
+    def make_header(
+        self,
+        lba: int,
+        alt_lba: int,
+        entry_start: int,
+    ):
+        """Make GPT header."""
+        data = struct.pack(
+            "<8sIIIIQQQQ16sQIII",
+            b"EFI PART",                  # signature
+            0x00010000,                   # revision number
+            92,                           # header size
+            0,                            # CRC placeholder
+            0,                            # reserved, always 0
+            lba,                          # this header's LBA
+            alt_lba,                      # other header LBA
+            self.PARTITION_START_LBA,     # partition LBA start
+            self.last_usable,             # partition LBA end
+            self.to_le(self.guid),
+            entry_start,                  # entries start LBA
+            self.ENTRY_COUNT,
+            self.ENTRY_SIZE,
+            self.entries_crc,             # entries checksum
+        )
+
+        crc = self.make_checksum(data)
+        data = data[:16] + struct.pack("<I", crc) + data[20:]
+        return clear(SECTOR_SIZE, data)
