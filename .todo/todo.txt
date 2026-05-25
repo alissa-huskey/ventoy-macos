@@ -1,14 +1,12 @@
 (C) 2026-05-19 @housekeeping Disk.format(): add test for fallback to diskutil
 (Z) 2026-05-20 @feature Add a list command to show USB devices.
 (Z) 2026-05-20 @feature Disk: Add .file_system
-
 (B) 2026-05-23 @refactor Make my own alternate Theme since the rich one isn't working
 (Z) 2026-05-23 @feature Rule: Add title_style kwarg
 2026-05-23 Consider adding extra stuff that's not being printed to a log somewhere.
 2026-05-23 @refactor rename workdir
 (A) 2026-05-23 @refactor Add some way to use last downloaded dir
 (B) 2026-05-23 Do chmod and chown on downloaded files and dir
-2026-05-23 Move .get_latest() from App.version to CLI so it can be wrapped in a .status() context manager
 (B) 2026-05-23 @quality run(): add error handling
 2026-05-23 @refactor Move partition1 definition from CLI -> Disk
 2026-05-23 Write real tests for CLI.
@@ -16,8 +14,15 @@
 (B) 2026-05-24 Add --no-op mode (have FD and run() look at it, that should skip most operations I think)
 2026-05-24 Consider logging before/after disk .info and .current_layout
 2026-05-24 Add --pdb flag to enter debugger on exception
-2026-05-24 Maybe move .get_latest() out of Downloader(), since you can't access app.downloader without a version.
-2026-05-24 Add a message if you use the local files instead of downloading
 2026-05-24 Partition: refactor to store all diskutil list info and use properties/attrs
 2026-05-24 Add a Layout/Table/Partitions class
 2026-05-24 Rename sector -> block
+(A) 2026-05-24 Refactor to prepare full ventoy .img file on disk
+(A) 2026-05-25 protect against failed operations
+2026-05-25 Do the writes in a buffer, then write to disk at the end.
+2026-05-25 Write the .img files first, the partition table last.
+2026-05-25 Zero out 1st MB and GPT header area as the first step; on failure, tell the user install failed and the disk needs to be reformatted.
+2026-05-25 After failed install, offer to reformat the disk (diskutil eraseDisk ExFAT UNTITLED GPT /dev/disk4)
+2026-05-25 In FD._write(): Check os.write return value (bytes writte). If zero, raise an exception.
+2026-05-25 Wrap CLI.write_to_disk() in a try/except block.
+2026-05-25 FD.__exit__(): call .save() before .close()

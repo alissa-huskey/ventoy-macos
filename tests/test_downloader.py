@@ -68,7 +68,7 @@ def test_downloader_request_failed(monkeypatch, downloader):
         assert exception.response and exception.response == response
 
 
-def test_downloader_get_latest(monkeypatch, downloader):
+def test_downloader_get_latest(monkeypatch):
     """
     WHEN: .get_latest() is called
     THEN: it should return the latest ventoy release version.
@@ -77,7 +77,7 @@ def test_downloader_get_latest(monkeypatch, downloader):
         response = Stub(ok=True, json=lambda: json.loads('{"tag_name": "v1.1.12"}'))
         m.setattr("requests.get", lambda url, *a, **k: response)
 
-        tag = downloader.get_latest()
+        tag = Downloader.get_latest()
 
         assert tag == "1.1.12"
 

@@ -24,6 +24,28 @@ class Downloader(Object):
         "disk_img": None,
     }
 
+    @classmethod
+    def get_latest(cls) -> str:
+        """Return the git tag name for the latest ventoy release."""
+        url = f"https://api.github.com/repos/{cls.REPO}/releases/latest"
+        response = cls.request(url)
+        data = response.json()
+
+        return data["tag_name"].lstrip("v")
+
+    @classmethod
+    def request(self, url, *args, **kwargs) -> requests.Response:
+        """Make a get request."""
+        response = requests.get(url, *args, **kwargs)
+
+        if not response.ok:
+            raise VentoyMacosError(
+                f"Request Failed [{response.status_code} {response.reason}]: {url}",
+                response=response
+            )
+
+        return response
+
     @property
     def tarball_path(self):
         """Return the path to the tarball in the working directory."""
@@ -65,30 +87,9 @@ class Downloader(Object):
 
         return False
 
-    def request(self, url, *args, **kwargs) -> requests.Response:
-        """Make a get request."""
-        response = requests.get(url, *args, **kwargs)
-
-        if not response.ok:
-            raise VentoyMacosError(
-                f"Request Failed [{response.status_code} {response.reason}]: {url}",
-                response=response
-            )
-
-        return response
-
-    def get_latest(self) -> str:
-        """Return the git tag name for the latest ventoy release."""
-        url = f"https://api.github.com/repos/{self.REPO}/releases/latest"
-        response = self.request(url)
-        data = response.json()
-
-        self.version = data["tag_name"].lstrip("v")
-        return self.version
-
     def download(self) -> Path:
         """Download the ventoy release return the tarball path."""
-        dest = Path(self.workdir) / self.tarball_path
+        dest = self.tarball_path
 
         if not dest.is_file():
             response = self.request(self.url)

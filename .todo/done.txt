@@ -11,3 +11,6 @@ x 2026-05-24 2026-05-23 @refactor Separate app.get_latest from app.get_ventoy so
 x 2026-05-24 2026-05-23 @validation Check for validity of working dir earlier
 x 2026-05-24 2026-05-20 @refactor Consider making a Image class (for boot.img, etc)
 x 2026-05-24 2026-05-24 Add used capacity to target disk info table
+x 2026-05-24 2026-05-23 Move .get_latest() from App.version to CLI so it can be wrapped in a .status() context manager
+x 2026-05-24 2026-05-24 Add a message if you use the local files instead of downloading
+x 2026-05-24 2026-05-24 Maybe move .get_latest() out of Downloader(), since you can't access app.downloader without a version.

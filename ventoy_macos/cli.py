@@ -19,13 +19,14 @@ from rich.text import Text
 from rich.traceback import install as rich_tracebacks
 
 from ventoy_macos import VentoyMacosError
+from ventoy_macos._exclude import EXCLUDE
 from ventoy_macos.app import App
 from ventoy_macos.common import b2s, run, size_text
 from ventoy_macos.disk import Disk
 from ventoy_macos.downloader import Downloader
 from ventoy_macos.rule import Rule
 
-rich_tracebacks(show_locals=True)
+rich_tracebacks(show_locals=True, suppress=EXCLUDE)
 
 bp = breakpoint
 
@@ -156,6 +157,10 @@ class CLI():
         self.err(*message, **kwargs)
         sys.exit(1)
 
+    def done(self, task):
+        """Print a task with a checkmark."""
+        self.print(f"[green]✔[/green] {task}")
+
     # ── Interactive ──────────────────────────────────────────────────────
 
     def pause(self, seconds: int = 1):
@@ -211,7 +216,7 @@ class CLI():
             with self.console.status(f"{task}..."):
                 yield
                 if persist:
-                    self.print(f"[green]✔[/green] {task}")
+                    self.done(task)
 
     # ── Layout and Formattng ─────────────────────────────────────────────
 
@@ -240,7 +245,7 @@ class CLI():
             title,
             align="left",
             end_size=2,
-            style="green",
+            style="purple4",
         )
 
         if print:
@@ -458,9 +463,9 @@ class CLI():
         self.print(self.header("Collecting Ventoy disk images"), before=1, after=1)
 
         if not self.app.version:
-            if self.confirm("Request latest Ventoy release number?"):
-                with self.status("Fetching version", persist=False):
-                    self.app.version = Downloader().get_latest()
+            if self.confirm("Request latest Ventoy release number?", persist=False):
+                with self.status("Fetching version"):
+                    self.app.version = Downloader.get_latest()
             else:
                 self.print(
                     "Ok. Use the --ventoy-version option next time.",
@@ -471,23 +476,43 @@ class CLI():
 
         downloader = self.app.downloader
 
-        if not self.confirm("Download Ventoy?", persist=False):
-            self.print(
-                "Ok. Next time use --work-dir to point to your local downloads.",
-                before=1,
-                padding=None,
-            )
-            exit()
+        # skip everything if there are already disk images
+        if all([i.dest.exists() for i in self.app.images.values()]):
+            self.done(f"Using Ventoy disk images in {self.app.workdir}")
+            return
 
-        with self.status(f"Downloading: {downloader.url}"):
-            downloader.download()
+        # if there's already a ventoy dir, skip to decompress
+        if downloader.ventoy_dir.is_dir():
+            self.done(f"Using Ventoy dir in {self.app.workdir}")
+        else:
 
-        with self.status("Extracting Ventoy package"):
-            downloader.extract()
+            # skip downloading the tarball if it already exists
+            if downloader.tarball_path.is_file():
+                self.done(f"Using Ventroy tarball in {self.app.workdir}")
+            else:
+                if not self.confirm("Download Ventoy?", persist=False):
+                    self.print(
+                        (
+                            "Ok. Next time use --work-dir to "
+                            "point to your local downloads.",
+                        ),
+                        before=1,
+                        padding=None,
+                    )
+                    exit()
+
+                with self.status(f"Downloading: {downloader.url}"):
+                    downloader.download()
+
+            with self.status("Extracting Ventoy package"):
+                downloader.extract()
 
         with self.status("Decompressing disk images"):
             for img in self.app.images.values():
                 img.decompress()
+
+        # give user rw access to all files in workdir
+        self.app.chmod()
 
     def show_disk_info(self):
         """Print the disk details and layout."""
@@ -674,6 +699,9 @@ class CLI():
         self.validate_sys()
 
         self.get_ventoy()
+
+        self.print(self.header("Summary"), before=1)
+
         self.show_ventoy_info()
 
         self.validate_disk()

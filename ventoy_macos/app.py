@@ -2,6 +2,7 @@
 
 import tempfile
 from argparse import Namespace
+from os import chmod
 from pathlib import Path
 
 from attr import attr, hasattrs
@@ -31,12 +32,16 @@ class App(Object):
 
     REPO = "ventoy/Ventoy"
 
-    args = None
+    WRITE = 0o22  # go+w permissions
 
     IMAGES_RELDIRS = {
         "boot": ("boot", "boot.img"),
         "core": ("boot", "core.img.xz"),
         "disk": ("ventoy", "ventoy.disk.img.xz"),
+    }
+
+    ATTRS = {
+        "args": None,
     }
 
     def __init__(self, args: Namespace = None, **kwargs):
@@ -49,12 +54,14 @@ class App(Object):
         """Return the directory to save and extract working files from."""
         if not self._workdir:
             if self.args and self.args.work_dir:
-                workdir = Path(self.args.work_dir)
+                workdir = self.args.work_dir
             else:
                 workdir = tempfile.mkdtemp(prefix="ventoy-macos-")
-                workdir = Path(workdir)
-            self._workdir = workdir
+            self._workdir = Path(workdir)
         return self._workdir
+
+    def mktemp(self):
+        """Create a temporary directory."""
 
     @workdir.setter
     def workdir(self, value):
@@ -87,7 +94,7 @@ class App(Object):
         if self.disk and not self._builder:
             self._builder = Builder(
                 self.disk,
-                self.gpt,
+                gpt=self.gpt,
                 images=self.images,
             )
         return self._builder
@@ -127,3 +134,13 @@ class App(Object):
             if self.args and self.args.ventoy_version:
                 self._version = self.args.ventoy_version
         return self._version
+
+    def chmod(self, dir: Path = None):
+        """Add write permissions to directory and all children recursively."""
+        dir = dir or self.workdir
+
+        for path in dir.iterdir():
+            current = path.stat().st_mode
+            chmod(path, current + self.WRITE)
+            if path.is_dir():
+                self.chmod(path)

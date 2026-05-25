@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tests import Stub
+from tests import Stub, copy_fixture
 from ventoy_macos.app import App
 from ventoy_macos.disk import Disk
 from ventoy_macos.disk_image import DiskImage
@@ -50,6 +50,37 @@ def test_app_images(fixtures_path):
 
     assert len(app.images) == 3
     assert all([isinstance(img, DiskImage) for img in app.images.values()])
+
+
+def test_chmod(tmp_path):
+    """
+    drwxr-xr-x 18 alissa staff 576  Apr 23 04:04 ventoy-1.1.12
+    -rw-r--r--  1 alissa staff 2.6K Apr 23 04:04 ventoy-1.1.12/README
+    -rwxr-xr-x  1 alissa staff 2.4K Apr 23 04:04 ventoy-1.1.12/Ventoy2Disk.sh
+    """
+
+    # relpath -> (old permission, new permission)
+    # a small sample of files in the extracted dir
+    # (old permission is just for reference)
+    files = {
+        "ventoy-1.1.12": (0o40755, 0o40777),
+        "ventoy-1.1.12/README": (0o100644, 0o100666),
+        "ventoy-1.1.12/Ventoy2Disk.sh": (0o100755, 0o100777),
+    }
+
+    app = App(args=Stub(work_dir=tmp_path, ventoy_version="1.1.12"))
+    copy_fixture("ventoy-1.1.12-linux.tar.gz", tmp_path)
+
+    app.downloader.extract()
+
+    app.chmod()
+
+    for name, (old, new) in files.items():
+        path = tmp_path / name
+        mode = path.stat().st_mode
+        _mode = oct(mode)
+
+        assert mode == new, f"{name}: Expected mode: {new:#o} but got {_mode}"
 
 
 #  def test_app_():

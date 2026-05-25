@@ -8,12 +8,11 @@ from uuid import uuid4
 from attr import attr, hasattrs
 
 from ventoy_macos import SECTOR_SIZE, VentoyMacosError
-from ventoy_macos.common import b2s, s2b
+from ventoy_macos.common import b2s, clear, s2b
 from ventoy_macos.decorators import _private_setter, require_fd, verify_attr
 from ventoy_macos.disk import Disk
 from ventoy_macos.disk_image import DiskImage
 from ventoy_macos.fd import FD
-from ventoy_macos.gpt import clear
 from ventoy_macos.object import Object
 from ventoy_macos.partialproperty import partialproperty
 
