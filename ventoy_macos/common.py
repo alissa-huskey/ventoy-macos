@@ -31,6 +31,16 @@ def s2g(sectors: int) -> float:
     return (sectors * SECTOR_SIZE) / (1024**3)
 
 
+def g2b(gb: int) -> int:
+    """Convert GB to bytes."""
+    return gb * (1024**3)
+
+
+def g2s(gb: int) -> int:
+    """Convert GB to sectors."""
+    return g2b(gb) // SECTOR_SIZE
+
+
 def s2m(sectors: int) -> float:
     """Convert sectors to MB."""
     return s2g(sectors) * 1000

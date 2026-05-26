@@ -2,6 +2,7 @@
 
 import tempfile
 from argparse import Namespace
+from functools import cached_property
 from os import chmod
 from pathlib import Path
 from stat import S_IMODE
@@ -13,6 +14,7 @@ from ventoy_macos.disk import Disk
 from ventoy_macos.disk_image import DiskImage
 from ventoy_macos.downloader import Downloader
 from ventoy_macos.gpt import GPT
+from ventoy_macos.logger import Logger
 from ventoy_macos.object import Object
 
 bp = breakpoint
@@ -51,6 +53,11 @@ class App(Object):
         self.args = args
         super().__init__(**kwargs)
 
+    @cached_property
+    def log(self) -> Logger:
+        """Return a Logger instance."""
+        return Logger(path=self.workdir / "ventoy-macos.log")
+
     @attr
     def workdir(self) -> Path:
         """Return the directory to save and extract working files from."""
@@ -60,10 +67,8 @@ class App(Object):
             else:
                 workdir = tempfile.mkdtemp(prefix="ventoy-macos-")
             self._workdir = Path(workdir)
+        (self._workdir / "data").mkdir(exist_ok=True)
         return self._workdir
-
-    def mktemp(self):
-        """Create a temporary directory."""
 
     @workdir.setter
     def workdir(self, value):
@@ -98,6 +103,7 @@ class App(Object):
                 self.disk,
                 gpt=self.gpt,
                 images=self.images,
+                path=self.workdir,
             )
         return self._builder
 

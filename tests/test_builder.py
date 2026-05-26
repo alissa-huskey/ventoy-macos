@@ -1,6 +1,7 @@
-from uuid import UUID
+from uuid import uuid4
 
 import pytest
+from loguru import logger  # noqa F401
 
 from tests import Stub
 from ventoy_macos import VentoyMacosError
@@ -150,19 +151,18 @@ def test_builder_write_gpt_marker(fake_disk, patch_os_write):
     assert data[92:93] == b"\x22"
 
 
-@pytest.mark.skip("The test is broken, but the thing works I think.")
 def test_builder_write_second_gpt_marker(fake_disk, patch_os_write):
     builder = Builder(fake_disk)
     builder.write_second_gpt_marker()
 
     data = DATA.pop()
 
-    print(data)
-    assert data[500: 501] == b"\x23"
+    assert data == b"\x23"
 
 
 def test_builder_write_disk_uuid(fake_disk, patch_os_write):
-    builder = Builder(fake_disk)
+    id = uuid4()
+    builder = Builder(fake_disk, gpt=Stub(guid=id))
     builder.write_disk_uuid()
 
     data = DATA.pop()
@@ -170,10 +170,7 @@ def test_builder_write_disk_uuid(fake_disk, patch_os_write):
     offset = 384
     uuid = data[offset: offset + 16]
 
-    try:
-        assert UUID(bytes=uuid)
-    except ValueError:
-        assert False, "A valid UUID was not patched in at offset 384."
+    assert uuid == id.bytes
 
 
 def test_builder_write_disk_signature(fake_disk, patch_os_write):

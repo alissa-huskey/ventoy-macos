@@ -1,8 +1,18 @@
 import pytest
+from loguru import logger
 
 from ventoy_macos.cli import CLI
 
 bp = breakpoint
+
+
+@pytest.fixture(autouse=True)
+def disable_logger():
+    """"""
+    CLI.log = logger
+    logger.remove()
+    yield
+    del CLI.log
 
 
 @pytest.fixture

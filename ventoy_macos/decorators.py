@@ -45,7 +45,7 @@ def verify_attr(*attrs):
 
         @wraps(func)
         def wrapper(self):
-            """Ensure .disk exists and open self.fd if it is not already."""
+            """Ensure .attr exists and is a truthy value."""
             for a in attrs:
                 value = getattr(self, a, None)
                 if not value:

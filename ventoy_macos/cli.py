@@ -18,12 +18,13 @@ from rich.table import Table
 from rich.text import Text
 from rich.traceback import install as rich_tracebacks
 
-from ventoy_macos import VentoyMacosError, VentoyMacosWriteError
+from ventoy_macos import VentoyMacosWriteError
 from ventoy_macos._exclude import EXCLUDE
 from ventoy_macos.app import App
 from ventoy_macos.common import b2s, run, size_text
 from ventoy_macos.disk import Disk
 from ventoy_macos.downloader import Downloader
+from ventoy_macos.logger import Logger, log_catch
 from ventoy_macos.rule import Rule
 
 rich_tracebacks(show_locals=True, suppress=EXCLUDE)
@@ -45,6 +46,8 @@ class CLI():
 
     app = None
 
+    ec = None
+
     @attr
     def console(self) -> Console:
         """Return a console instance.
@@ -60,6 +63,29 @@ class CLI():
                 force_interactive=self.enable_interactive,
             )
         return self._console
+
+    @attr
+    def log(self) -> Logger:
+        """Return a Logger instance.
+
+        This will be set in run(), but setting it here in case it is needed
+        sooner or if that fails.
+        """
+        if not self._log:
+            self._log = Logger()
+        return self._log
+
+    def log_start(self):
+        """Log the start or end of the program."""
+        self.log.div()
+        self.log.info("Starting.")
+        for name, value in self.app.args._get_kwargs():
+            self.log.info(f"Option: {name}={value}")
+
+    def log_end(self):
+        """Log the end of the program."""
+        self.log.info(f"Done. (ec={self.ec})")
+        self.log.div()
 
     # ── Printing ─────────────────────────────────────────────────────────
 
@@ -154,6 +180,7 @@ class CLI():
 
     def abort(self, *message, **kwargs):
         """Print an error message and exit."""
+        self.log.critical("\n".join(message))
         self.err(*message, **kwargs)
         sys.exit(1)
 
@@ -208,6 +235,7 @@ class CLI():
             persist (bool, default=True): if the message should persist (by
                 printing a checkmark line to stdout after the task has completed)
         """
+        self.log.info(task)
         if not self.console.is_interactive:
             self.print(f"  {task}...")
             yield
@@ -323,9 +351,11 @@ class CLI():
         )
         options.update(kwargs)
 
+        if title:
+            options["title"] = title
+
         return Panel(
             Group(*data),
-            title=title,
             **options,
         )
 
@@ -622,6 +652,7 @@ class CLI():
                     builder.write_primary_header()
 
                 with self.status("Finalizing all writes"):
+                    self.log.info("Saving to disk.")
                     builder.fd.save()
 
         except BaseException as e:
@@ -635,9 +666,11 @@ class CLI():
         macOS didn't finalize the writes untl the function completed, which
         meant that the new partition scheme was not picked up.
         """
+        device = f"{self.disk.device}s1"
         with self.status("Waiting for macOS to detect partitions"):
+            self.log.info(f"Unmounting partition 1: {device}")
             self.pause(3)
-            disk = Disk(f"{self.disk.device}s1")
+            disk = Disk(device)
             disk.unmount()
 
         with self.status(f"Formatting {disk.device} as exFAT"):
@@ -648,6 +681,7 @@ class CLI():
         """Print final disk layout and verify partition 1 offset."""
         with self.status("Verifying disk", persist=False):
             self.pause(2)
+            self.log.info(f"Mounting disk: {self.disk.device}")
             self.disk.mount()
             self.pause()
 
@@ -659,6 +693,12 @@ class CLI():
                 "Partition 1 does not start at sector 2048.",
                 prefix="  :x:",
             )
+
+        self.ec = 0
+        self.log.success(
+            f"Ventoy {self.app.version} successfully "
+            f"installed on {self.disk.device}"
+        )
 
         self.print(
             f":star: Ventoy {self.app.version} installed successfully! :star:",
@@ -687,10 +727,11 @@ class CLI():
     def show_ventoy_info(self):
         """Print ventoy info panel."""
         panel = self.panel(
-            "Ventoy",
+            None,
             self.info_grid([
                 ("Ventoy Version:", self.app.version),
                 ("Working Directory:", str(self.app.workdir)),
+                ("Log file:", str(self.log.path)),
                 ("", ""),
                 ("Boot Images", ""),
                 *[
@@ -702,12 +743,15 @@ class CLI():
         )
         self.print(panel, before=1)
 
+    @log_catch(reraise=True)
     def run(self):
         """Run the CLI."""
         self.parse_args()
 
         self.app = App(self.args)
         self.disk = self.app.disk
+        self.log = self.app.log
+        self.log_start()
 
         # disable interactive mode while in debug mode
         # otherwise breakpionts cause problems
@@ -749,13 +793,20 @@ class CLI():
         self.verify()
 
 
+@log_catch(reraise=True)
 def main():
     """Run the program."""
     try:
         cli = CLI()
         cli.run()
 
-    except VentoyMacosError as e:
+    # clean exits
+    except (BdbQuit, KeyboardInterrupt, SystemExit):
+        cli.ec = 0
+        print()
+
+    except VentoyMacosWriteError as e:
+        cli.ec = 1
         cli.line(2)
         cli.err("Install failed.", str(e.ex), prefix=":collision:")
         cli.line(1)
@@ -767,7 +818,8 @@ def main():
         )
 
         exit(1)
-    except VentoyMacosError as e:
+    except BaseException as e:
+        cli.ec = 1
         if cli.app and cli.app.args and cli.app.args.debug:
             # print the traceback if in debug mode
             cli.console.print_exception()
@@ -777,10 +829,10 @@ def main():
             # otherwise print a shorter and prettier error message
             cli.abort(
                 "Something went wrong unexpectedly.",
-                str(e),
+                f"{e.__class__.__name__}: {e}",
+                "See the log for more details",
                 prefix=":collision:",
             )
 
-    # clean exits
-    except (BdbQuit, KeyboardInterrupt):
-        ...
+    finally:
+        cli.log_end()

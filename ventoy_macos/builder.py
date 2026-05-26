@@ -1,11 +1,11 @@
 """Bootable USB Builder."""
 
-from functools import partial
+from functools import cached_property, partial
 from os import urandom
-from time import sleep
-from uuid import uuid4
+from time import sleep, time
 
 from attr import attr, hasattrs
+from loguru import logger
 
 from ventoy_macos import SECTOR_SIZE, VentoyMacosError
 from ventoy_macos.common import b2s, clear, s2b
@@ -30,7 +30,11 @@ class Builder(Object):
         "disk": None,
         "gpt": None,
         "images": {},
+        "path": None,
     }
+
+    SAVE_DATA: bool = False
+    """Enable/disable saving large data chunks to workdir/data."""
 
     _boot_img = None
     _core_img = None
@@ -105,6 +109,42 @@ class Builder(Object):
         name="disk_img",
     )
 
+    def store_data(self, name: str, value: bytes):
+        """Save a copy of value to the workdir/data."""
+        if not (self.SAVE_DATA and self.path):
+            return
+        path = self.path / "data"
+        name = name.lower().replace(" ", "-")
+        file = path / f"{self.ts}-{name}"
+        file.write_bytes(value)
+
+    def log_write(
+        self,
+        name: str,
+        position: int,
+        value: bytes,
+        length: int = None,
+    ):
+        """Write a log message about a write."""
+        length = length or len(value)
+
+        limit = 100
+        if length > limit:
+            self.store_data(name, value)
+            value = value[:limit] + b"..."
+
+        logger.info(f"Writing {name} to disk @ {position} ({length}): {value!r}")
+
+    @cached_property
+    def signature(self) -> bytes:
+        """Return a random signature."""
+        return urandom(4)
+
+    @cached_property
+    def ts(self):
+        """Return a timestamp."""
+        return int(time())
+
     @attr
     def fd(self) -> FD:
         """Get the fd object."""
@@ -118,6 +158,7 @@ class Builder(Object):
         """Unmount disk and wait for it to finish."""
         if not self.disk:
             return
+        logger.info(f"Unmounting disk: {self.disk.device}")
         self.disk.unmount()
         sleep(self.PAUSE)
 
@@ -138,15 +179,29 @@ class Builder(Object):
         self.write_init_backup()
         self.fd.save()
 
+    def write(self, what: str, position: int, data: bytes, value=None):
+        """Log and perform a write to disk.
+
+        Arguments:
+            what (str): task title to log
+            position (int): position (bytes) on disk to start the write
+            data (bytes): data to write to disk
+            value (optional): value to log, if different than data
+        """
+        value = value or data
+        self.log_write(what, position, value, len(data))
+        self.fd.write(position, data)
+
     @require_fd
     def write_init_header(self):
         """Zero first 1MB (protective MBR + GPT header + entries area)."""
-        self.fd.write(0, clear(s2b(2048)))
+        self.write("Zeros to First 1MB", 0, clear(s2b(2048)))
 
     @require_fd
     def write_init_backup(self):
         """Zero backup GPT area."""
-        self.fd.write(
+        self.write(
+            "Zeros to GPT area",
             s2b(self.disk.sectors - 33),
             clear(s2b(33)),
         )
@@ -155,36 +210,37 @@ class Builder(Object):
     @require_fd
     def write_mbr(self):
         """Write protective MBR."""
-        self.fd.write(0, self.mbr)
+        self.write("PMBR", 0, self.mbr)
 
     @verify_attr("primary")
     @require_fd
     def write_primary_header(self):
         """Write primary GPT header (sector 1)."""
-        self.fd.write(SECTOR_SIZE, self.primary)
+        self.write("Primary Header", SECTOR_SIZE, self.primary)
 
     @verify_attr("entries")
     @require_fd
     def write_entries(self):
         """Write backup GPT entries + header."""
-        self.fd.write(s2b(2), self.entries)
+        self.write("Entries", s2b(2), self.entries)
 
     @verify_attr("entries", "backup")
     @require_fd
     def write_backup(self):
         """Write backup GPT."""
-        self.fd.write(s2b(self.disk.sectors - 33), self.entries)
-        self.fd.write(s2b(self.disk.sectors - 1),  self.backup)
+        self.write("Backup Entries", s2b(self.disk.sectors - 33), self.entries)
+        self.write("Backup Headers", s2b(self.disk.sectors - 1), self.backup)
 
     @verify_attr("boot_img")
     @require_fd
     def write_boot_img(self):
         """Write Ventoy boot.img (446 bytes of BIOS boot code to MBR)."""
-        self.fd.patch(0, 0, self.boot_img[:446])
+        self.log_write("boot.img", 0, self.boot_img[:446])
 
     @require_fd
     def write_gpt_marker(self):
         """Write GPT marker at offset 92."""
+        self.log_write("GPT Marker", 92, b"\x22")
         self.fd.patch(0, 92, b"\x22")
 
     @verify_attr("core_img")
@@ -192,27 +248,39 @@ class Builder(Object):
     def write_core_img(self):
         """Write core.img."""
         core = self.core_img[: s2b(2014)]
+
+        # I dont understand why this is here
+        # core should always s2b(2014)
+        # and s2b(2014) % SECTOR_SIZE == 0
         if len(core) % SECTOR_SIZE:
             core += clear((SECTOR_SIZE - len(core) % SECTOR_SIZE))
-        self.fd.write(s2b(34), core)
+
+        self.write("core.img", s2b(34), core)
 
     @verify_attr("disk_img", "layout")
     @require_fd
     def write_disk_img(self):
         """Write ventoy.disk.img to partition 2."""
-        self.fd.write(s2b(self.layout[1].start), self.disk_img)
+        self.write("ventoy.disk.img", s2b(self.layout[1].start), self.disk_img)
 
     @require_fd
     def write_disk_uuid(self):
         """Write disk UUID at offset 384."""
-        self.fd.patch(0, 384, uuid4().bytes)
+        value = self.gpt.guid
+
+        self.log_write("Disk UUID", 384, value, length=len(value.bytes))
+        self.fd.patch(0, 384, value.bytes)
 
     @require_fd
     def write_disk_signature(self):
         """Write disk signature at offset 440."""
-        self.fd.patch(0, 440, urandom(4))
+        self.log_write("Disk Signature", 440, self.signature)
+        self.fd.patch(0, 440, self.signature)
 
     @require_fd
     def write_second_gpt_marker(self):
         """Write second GPT marker."""
-        self.fd.patch(*b2s(17908), b"\x23")
+        value = b"\x23"
+        pos = b2s(17908)
+        self.log_write("Second GPT Marker", 17908, value)
+        self.fd.patch(*pos, value)

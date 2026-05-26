@@ -6,6 +6,8 @@ from functools import cached_property
 from pathlib import Path
 from re import compile as re_compile
 
+from attr import attr, hasattrs
+
 from ventoy_macos import SECTOR_SIZE as _SECTOR_SIZE
 from ventoy_macos import VentoyMacosError
 from ventoy_macos.common import b2s, run, s2b, s2g
@@ -15,14 +17,13 @@ from ventoy_macos.partition import Partition
 bp = breakpoint
 
 
+@hasattrs
 class Disk(Object):
     """A disk object."""
 
     SECTOR_NUM = 65536  # 32MB for EFI partition
     SECTOR_SIZE = _SECTOR_SIZE
     SIZE_RE = re_compile(r'\((\d+) Bytes\)')
-
-    _sectors = None
 
     def __init__(self, device: str = None, **kwargs):
         """Initialize object."""
@@ -77,10 +78,10 @@ class Disk(Object):
 
         return data
 
-    @property
+    @attr
     def sectors(self) -> int:
         """Return the disk size in 512-byte-units."""
-        if not self._sectors:
+        if not self._sectors and self.info:
             try:
                 self._sectors, _ = b2s(int(self.info["TotalSize"]))
             # if the "Size" key is missing, or the value is not a valid int
@@ -88,11 +89,6 @@ class Disk(Object):
                 raise VentoyMacosError(f"Could not determine size of {self.device}")
 
         return self._sectors
-
-    @sectors.setter
-    def sectors(self, value):
-        """Set self.sectors."""
-        self._sectors = value
 
     @property
     def gb(self) -> float:
@@ -129,7 +125,7 @@ class Disk(Object):
     def planned_layout(self):
         """Calculate Ventoy-compatible partition layout."""
         # partition for disk images
-        # total disk size minus ~32G for the Ventoy partition
+        # total disk size minus ~32M for the Ventoy partition
         part1 = Partition(
             number=1,
             name="Ventoy",

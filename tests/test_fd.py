@@ -63,11 +63,12 @@ def test_fd_close(fake_disk):
     assert fd.is_open is False
 
 
-@pytest.mark.skip("not sure if this is broken")
-def test_fd_seek(fd):
-    position = fd.seek(5)
+def test_fd_seek(monkeypatch, fd):
+    with monkeypatch.context() as m:
+        m.setattr("os.lseek", lambda id, pos, mode: pos)
+        position = fd.seek(5)
 
-    assert position == 5
+        assert position == 5
 
 
 def test_fd__write(fd):

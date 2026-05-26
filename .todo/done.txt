@@ -19,3 +19,5 @@ x 2026-05-25 2026-05-25 Zero out 1st MB and GPT header area as the first step; o
 x 2026-05-25 2026-05-25 In FD._write(): Check os.write return value (bytes writte). If zero, raise an exception.
 x 2026-05-25 2026-05-25 Wrap CLI.write_to_disk() in a try/except block.
 x 2026-05-25 2026-05-25 FD.__exit__(): call .save() before .close()
+x 2026-05-26 2026-05-23 Do chmod and chown on downloaded files and dir
+x 2026-05-26 2026-05-23 Consider adding extra stuff that's not being printed to a log somewhere.
