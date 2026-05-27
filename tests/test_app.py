@@ -28,7 +28,7 @@ def test_app_disk():
     app = App(Stub(disk="/dev/disk4"))
 
     assert isinstance(app.disk, Disk)
-    assert app.disk.device == "/dev/disk4"
+    assert app.disk.location == "/dev/disk4"
 
 
 def test_app_version():

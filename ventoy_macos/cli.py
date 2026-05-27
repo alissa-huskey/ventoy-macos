@@ -21,8 +21,7 @@ from rich.traceback import install as rich_tracebacks
 from ventoy_macos import VentoyMacosWriteError
 from ventoy_macos._exclude import EXCLUDE
 from ventoy_macos.app import App
-from ventoy_macos.common import b2s, run, size_text
-from ventoy_macos.disk import Disk
+from ventoy_macos.common import b2s, run, s2b, size_text
 from ventoy_macos.downloader import Downloader
 from ventoy_macos.logger import Logger, log_catch
 from ventoy_macos.rule import Rule
@@ -220,7 +219,7 @@ class CLI():
             print(" " * self.console.width)
             print(self.screen.move(0, -2))
 
-        return answer.lower() == "y"
+        return answer.lower() in ("y", "yes")
 
     @contextmanager
     def status(self, task: str, persist: bool = True):
@@ -383,7 +382,7 @@ class CLI():
                 [
                     str(part.number),
                     part.name,
-                    part.format,
+                    part.fs,
                     size_text(part.sectors),
                     *func(part),
                 ]
@@ -473,7 +472,7 @@ class CLI():
         # must be removable and external
         if not self.disk.is_external():
             self.abort(
-                "Refusing to operate on {self.disk.device}",
+                "Refusing to operate on {self.disk.location}",
                 "(It must be removable and external.)",
                 prefix=":prohibited:",
             )
@@ -483,7 +482,7 @@ class CLI():
         # but it can't hurt to double check)
         if self.disk.is_system_disk():
             self.abort(
-                "Refusing to operate on {self.disk.device}",
+                "Refusing to operate on {self.disk.location}",
                 "(It is likely a system disk.)",
                 prefix=":prohibited:",
             )
@@ -550,9 +549,9 @@ class CLI():
         panel = self.panel(
             "Target disk",
             self.info_grid([
-                ("Name:", self.disk.info.get("MediaName", "")),
-                ("Partition Scheme:", self.disk.info.get("Content", "")),
-                ("Location:", self.disk.device),
+                ("Name:", self.disk.name or ""),
+                ("Partition Scheme:", self.disk.fs or ""),
+                ("Location:", self.disk.location),
                 ("Disk size:", f"{self.disk.gb:.1f} GiB ({self.disk.sectors} sectors)")
             ]),
             "\n",
@@ -561,16 +560,22 @@ class CLI():
         )
         self.print(panel)
 
-        self.disk_layout(
-            "Current Layout",
-            self.disk.current_layout,
-            ["Free", "Identifier"],
-            lambda part: [
-                size_text(b2s(part.disk.info.get("FreeSpace"))[0]),
-                part.identifier,
-            ],
-            print=True,
-        )
+        if not self.disk.partitions:
+            self.print(self.panel(
+                "Current Layout",
+                "No partitions.",
+            ))
+        else:
+            self.disk_layout(
+                "Current Layout",
+                self.disk.partitions,
+                ["Free", "Identifier"],
+                lambda part: [
+                    size_text(b2s(part.free)[0]),
+                    part.id,
+                ],
+                print=True,
+            )
 
         self.disk_layout(
             "Planned Layout",
@@ -666,38 +671,58 @@ class CLI():
         macOS didn't finalize the writes untl the function completed, which
         meant that the new partition scheme was not picked up.
         """
-        device = f"{self.disk.device}s1"
-        with self.status("Waiting for macOS to detect partitions"):
-            self.log.info(f"Unmounting partition 1: {device}")
-            self.pause(3)
-            disk = Disk(device)
-            disk.unmount()
+        try:
+            part = self.disk.partitions[0]
+        except IndexError:
+            self.line()
+            self.abort(
+                "Install failed.",
+                f"There are no partitions on disk {self.disk.location}.",
+                prefix="  :x:",
+            )
 
-        with self.status(f"Formatting {disk.device} as exFAT"):
+        with self.status("Waiting for macOS to detect partitions"):
+            self.log.info(f"Unmounting partition 1: {part.location}")
+            self.pause(3)
+            part.unmount()
+
+        with self.status(f"Formatting {part.location} as exFAT"):
             self.pause()
-            disk.format()
+            part.format()
 
     def verify(self):
         """Print final disk layout and verify partition 1 offset."""
-        with self.status("Verifying disk", persist=False):
+        with self.status("Verifying disk"):
             self.pause(2)
-            self.log.info(f"Mounting disk: {self.disk.device}")
+            self.log.info(f"Mounting disk: {self.disk.location}")
             self.disk.mount()
             self.pause()
 
-        partition = Disk(f"{self.disk.device}s1")
-        if not partition.verify():
+        try:
+            partition = self.disk.partitions[0]
+        except IndexError:
+            self.line()
+            self.abort(
+                "Install failed.",
+                f"There are no partitions on disk {self.disk.location}.",
+                prefix="  :x:",
+            )
+
+        if partition.offset != s2b(2048):
             self.line()
             self.abort(
                 "Ventoy disk is corrupted",
                 "Partition 1 does not start at sector 2048.",
                 prefix="  :x:",
             )
+        return True
 
+    def success(self):
+        """Print success message."""
         self.ec = 0
         self.log.success(
             f"Ventoy {self.app.version} successfully "
-            f"installed on {self.disk.device}"
+            f"installed on {self.disk.location}"
         )
 
         self.print(
@@ -707,11 +732,23 @@ class CLI():
             after=1,
         )
 
+        panel = self.panel(
+            "Ventoy Disk",
+            self.info_grid([
+                ("Name:", self.disk.name or ""),
+                ("Partition Scheme:", self.disk.fs or ""),
+                ("Location:", self.disk.location),
+                ("Disk size:", f"{self.disk.gb:.1f} GiB ({self.disk.sectors} sectors)"),
+            ]),
+            expand=False,
+        )
+        self.print(panel)
+
         self.disk_layout(
-            "New Disk Layout",
-            self.disk.current_layout,
+            "Layout",
+            self.disk.partitions,
             ["Identifier"],
-            lambda part: [part.identifier],
+            lambda part: [part.id],
             print=True,
         )
 
@@ -741,7 +778,7 @@ class CLI():
             ]),
             expand=False,
         )
-        self.print(panel, before=1)
+        self.print(panel)
 
     @log_catch(reraise=True)
     def run(self):
@@ -779,18 +816,27 @@ class CLI():
             after=1,
         )
 
-        if not self.confirm(f"Proceed with device: [b]{self.disk.device}[/b]?"):
+        if not self.confirm(f"Proceed with device: [b]{self.disk.location}[/b]?"):
             return
 
         self.print(self.header("Building Ventoy disk"), before=1, after=1)
+
+        parts = [
+            {"id": p.id, "fs": p.fs, "offset": p.offset, "size": size_text(p.gb)}
+            for p in self.disk.partitions
+        ]
+        self.log.info("before", info=self.disk.info, partitions=parts)
 
         # Write everything
         self.write_to_disk()
 
         self.format()
 
+        self.log.info("after", info=self.disk.info, partitions=parts)
+
         # Verify
-        self.verify()
+        if self.verify():
+            self.success()
 
 
 @log_catch(reraise=True)
@@ -812,7 +858,7 @@ def main():
         cli.line(1)
 
         print(
-            f"The disk: {cli.disk.device} may not be formatted.",
+            f"The disk: {cli.disk.location} may not be formatted.",
             "Strongly recommend erasing/formatting before use.",
             sep="\n",
         )

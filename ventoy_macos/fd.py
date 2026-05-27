@@ -25,7 +25,7 @@ class FD(Object):
         Returns `self`, which allows it to be used as a context manager.
         """
         if not self.is_open:
-            self.id = os.open(self.disk.raw_device, os.O_RDWR)
+            self.id = os.open(self.disk.raw_location, os.O_RDWR)
             self.is_open = True
         return self
 

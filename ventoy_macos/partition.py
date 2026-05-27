@@ -1,25 +1,24 @@
 """Disk partition."""
 
+from functools import cached_property
+
 from attr import attr, hasattrs
 
-from ventoy_macos.common import b2s
-from ventoy_macos.object import Object
+from ventoy_macos.device import Device
 
 bp = breakpoint
 
 
 @hasattrs
-class Partition(Object):
+class Partition(Device):
     """Disk partition."""
 
     ATTRS = {
         "number": None,
-        "format": None,
         "size": None,
-        "identifier": None,
         "start": None,
         "end": None,
-        "disk": None,
+        "parent": None,
     }
 
     @attr
@@ -28,6 +27,11 @@ class Partition(Object):
         if not self._sectors:
             if self.start and self.end:
                 self._sectors = self.end - self.start + 1
-            elif self.bytes:
-                self._sectors, _ = b2s(self.bytes)
+            elif self.size:
+                self._sectors = super().sectors
         return self._sectors
+
+    @cached_property
+    def offset(self) -> int:
+        """Return the partition offset position."""
+        return self.info_get("PartitionMapPartitionOffset")

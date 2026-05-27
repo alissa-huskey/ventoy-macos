@@ -4,6 +4,14 @@ from shutil import copy, copytree
 
 from ventoy_macos.object import Object
 
+COMMANDS = []
+
+
+def mock_run(args, **kwargs):
+    """Mock run command."""
+    COMMANDS.append(args)
+    return Stub(returncode=0)
+
 
 class Stub(Object):
     """Easily stub objects."""

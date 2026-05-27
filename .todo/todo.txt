@@ -1,23 +1,17 @@
 (C) 2026-05-19 @housekeeping Disk.format(): add test for fallback to diskutil
 (Z) 2026-05-20 @feature Add a list command to show USB devices.
-(Z) 2026-05-20 @feature Disk: Add .file_system
 (Z) 2026-05-23 @refactor Make my own alternate Theme since the rich one isn't working
 (Z) 2026-05-23 @feature Rule: Add title_style kwarg
-
 (C) 2026-05-23 @refactor Add some way to use last downloaded dir
 (C) 2026-05-23 @quality common.py:run(): add error handling
-(C) 2026-05-23 @refactor Move partition1 definition from CLI -> Disk
 (C) 2026-05-23 Write real tests for CLI.
 (B) 2026-05-24 Verify that partition layouts are the same using the orig script.
 (Z) 2026-05-24 Add --no-op mode (have FD and run() look at it, that should skip most operations I think)
-(B) 2026-05-24 Consider logging before/after disk .info and .current_layout
 (Z) 2026-05-24 Add --pdb flag to enter debugger on exception
-(B) 2026-05-24 Partition: refactor to store all diskutil list info and use properties/attrs
-(C) 2026-05-24 Add a Layout/Table/Partitions class
 (C) 2026-05-24 Rename sector -> block
 (B) 2026-05-24 Refactor to prepare full ventoy .img file on disk
-
 (B) 2026-05-25 Do the writes in a buffer, then write to disk at the end.
 (Z) 2026-05-25 After failed install, offer to reformat the disk (diskutil eraseDisk ExFAT UNTITLED GPT /dev/disk4)
 (Z) 2026-05-25 Add to Disk.verify()
-(B) 2026-05-26 Add flag or var to disable storing data to workdir/data
+(A) 2026-05-26 Test to make sure ventoy disk actually boots.
+2026-05-27 Get the version from working director if possible

@@ -3,122 +3,64 @@
 import plistlib
 import subprocess
 from functools import cached_property
-from pathlib import Path
 from re import compile as re_compile
-
-from attr import attr, hasattrs
 
 from ventoy_macos import SECTOR_SIZE as _SECTOR_SIZE
 from ventoy_macos import VentoyMacosError
-from ventoy_macos.common import b2s, run, s2b, s2g
-from ventoy_macos.object import Object
+from ventoy_macos.device import Device
 from ventoy_macos.partition import Partition
 
 bp = breakpoint
 
 
-@hasattrs
-class Disk(Object):
+class Disk(Device):
     """A disk object."""
 
     SECTOR_NUM = 65536  # 32MB for EFI partition
     SECTOR_SIZE = _SECTOR_SIZE
     SIZE_RE = re_compile(r'\((\d+) Bytes\)')
 
-    def __init__(self, device: str = None, **kwargs):
-        """Initialize object."""
-        self.device = device
-        super().__init__(**kwargs)
-
-    def __str__(self):
-        """Return a human readable string."""
-        return self.device or "Disk()"
-
-    @cached_property
-    def name(self) -> bool:
-        """Return the disk identifier."""
-        if not self.device:
-            return
-        return self.device.removeprefix("/dev/")
-
     @property
-    def raw_device(self) -> str:
-        """Return the raw device identifier."""
-        if not self.device:
+    def raw_location(self) -> str:
+        """Return the raw location identifier."""
+        if not self.location:
             return
-        return self.device.replace("/dev/disk", "/dev/rdisk")
-
-    def exists(self) -> bool:
-        """Return True if the disk exists."""
-        return self.device and Path(self.device).exists()
+        return self.location.replace("/dev/disk", "/dev/rdisk")
 
     def is_disk(self) -> bool:
         """Return True if it is a /dev/diskX that exists."""
-        return self.device.startswith("/dev/disk") and self.exists()
+        if self.is_partition():
+            return False
+        return self.location.startswith("/dev/disk") and self.exists()
 
     def is_system_disk(self) -> bool:
         """Return True if disk is likely a system disk."""
-        return self.name in ("disk0", "disk1")
-
-    def is_external(self) -> bool:
-        """Return True if the disk is external."""
-        return (
-            self.info.get("Removable", False) and
-            not self.info.get("Internal", True)
-        )
+        if self.info and self.info.get("SystemImage"):
+            return True
+        return self.id in ("disk0", "disk1")
 
     @cached_property
-    def info(self) -> dict:
-        """Return the diskutil info."""
-        if not self.exists():
-            return {}
-
-        raw = subprocess.check_output(["diskutil", "info", "-plist", self.device])
+    def list(self) -> dict:
+        """Return the diskutil list data."""
+        raw = subprocess.check_output(["diskutil", "list", "-plist", self.location])
         data = plistlib.loads(raw)
-
-        return data
-
-    @attr
-    def sectors(self) -> int:
-        """Return the disk size in 512-byte-units."""
-        if not self._sectors and self.info:
-            try:
-                self._sectors, _ = b2s(int(self.info["TotalSize"]))
-            # if the "Size" key is missing, or the value is not a valid int
-            except (KeyError, ValueError):
-                raise VentoyMacosError(f"Could not determine size of {self.device}")
-
-        return self._sectors
+        try:
+            info = data.get("AllDisksAndPartitions", [])[0]
+        except IndexError:
+            return []
+        return info.get("Partitions", [])
 
     @property
-    def gb(self) -> float:
-        """Return the disk size in GB."""
-        return s2g(self.sectors)
-
-    @property
-    def current_layout(self):
+    def partitions(self):
         """Return the current partition layout."""
-        raw = subprocess.check_output(["diskutil", "list", "-plist", self.device])
-        data = plistlib.loads(raw)
-        partitions = data["AllDisksAndPartitions"][0].get("Partitions", [])
         layout = []
 
-        for i, part in enumerate(partitions, 1):
+        for i, part in enumerate(self.list, 1):
             id = part.get("DeviceIdentifier", "")
-            disk = self.__class__(f"/dev/{part.get('DeviceIdentifier', '')}")
+            if not id:
+                raise VentoyMacosError("No partition id for this partition.")
 
-            obj = Partition(
-                number=i,
-                name=part.get("VolumeName", ""),
-                format=disk.info.get(
-                    "FilesystemUserVisibleName",
-                    part.get("Content", ""),
-                ),
-                identifier=id,
-                bytes=part.get("Size", ""),
-                disk=disk,
-            )
-            layout.append(obj)
+            layout.append(Partition(f"/dev/{id}", number=i, parent=self))
         return layout
 
     @cached_property
@@ -129,7 +71,7 @@ class Disk(Object):
         part1 = Partition(
             number=1,
             name="Ventoy",
-            format="exFAT",
+            fs="exFAT",
             start=2048,   # 1MB - Ventoy requirement
             end=(self.sectors - self.SECTOR_NUM - 34),
         )
@@ -138,7 +80,7 @@ class Disk(Object):
         part2 = Partition(
             number=2,
             name="VTOYEFI",
-            format="FAT16",
+            fs="FAT16",
             start=part1.end + 1,
         )
 
@@ -151,22 +93,3 @@ class Disk(Object):
         part2.end = part2.start + self.SECTOR_NUM - 1
 
         return [part1, part2]
-
-    def verify(self) -> bool:
-        """Verify the partition 1 offset starts at sector 2048."""
-        return self.info and self.info.get("PartitionMapPartitionOffset") == s2b(2048)
-
-    def mount(self):
-        """Mount the disk."""
-        run(["diskutil", "mountDisk", self.device], check=False)
-
-    def unmount(self):
-        """Mount the disk."""
-        run(["diskutil", "unmountDisk", "force", self.device], check=False)
-
-    def format(self):
-        """Format the disk."""
-        result = run(["newfs_exfat", "-v", "Ventoy", self.device], check=False)
-        if result.returncode != 0:
-            result = run(["diskutil", "eraseVolume", "ExFAT", "Ventoy", self.device])
-        return result.returncode == 0

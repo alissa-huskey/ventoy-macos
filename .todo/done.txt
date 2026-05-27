@@ -21,3 +21,9 @@ x 2026-05-25 2026-05-25 Wrap CLI.write_to_disk() in a try/except block.
 x 2026-05-25 2026-05-25 FD.__exit__(): call .save() before .close()
 x 2026-05-26 2026-05-23 Do chmod and chown on downloaded files and dir
 x 2026-05-26 2026-05-23 Consider adding extra stuff that's not being printed to a log somewhere.
+x 2026-05-26 2026-05-26 Add flag or var to disable storing data to workdir/data
+x 2026-05-27 2026-05-24 Consider logging before/after disk .info and .current_layout
+x 2026-05-27 2026-05-24 Partition: refactor to store all diskutil list info and use properties/attrs
+x 2026-05-27 2026-05-23 @refactor Move partition1 definition from CLI -> Disk
+x 2026-05-27 2026-05-24 Add a Layout/Table/Partitions class
+x 2026-05-27 2026-05-20 @feature Disk: Add .file_system

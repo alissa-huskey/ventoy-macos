@@ -34,3 +34,41 @@ def test_logger_warn(logger):
     assert logger.path.is_file()
     assert "hello" in (contents := logger.path.read_text())
     assert "WARNING" in contents
+
+
+@pytest.mark.parametrize(["args", "kwargs", "expected"], [
+    (["hello"], dict(value={"a": 1}), "[hello] value={'a': 1}"),
+    (["hello"], {}, "hello"),
+    (["hello", "there"], {}, "hello there"),
+    ([], dict(value={"a": 1}), "value={'a': 1}"),
+    (
+        [],
+        dict(info={
+            'Bootable': False,
+            'BusProtocol': 'USB',
+            'CanBeMadeBootable': False,
+            'CanBeMadeBootableRequiresDestroy': False,
+            'Content': 'GUID_partition_scheme',
+            'DeviceBlockSize': 512,
+            'DeviceIdentifier': 'disk4',
+        }),
+        """
+info={
+    'Bootable': False,
+    'BusProtocol': 'USB',
+    'CanBeMadeBootable': False,
+    'CanBeMadeBootableRequiresDestroy': False,
+    'Content': 'GUID_partition_scheme',
+    'DeviceBlockSize': 512,
+    'DeviceIdentifier': 'disk4'
+}
+    """,
+    ),
+])
+def test_logger_(logger, args, kwargs, expected):
+    text = logger._prepare(*args, **kwargs)
+    assert text.strip() == expected.strip()
+
+
+#  def test_logger_():
+#      ...

@@ -8,7 +8,7 @@ bp = breakpoint
 
 @pytest.fixture(autouse=True)
 def disable_logger():
-    """"""
+    """Ensure logs don't print to stdout or workdir."""
     CLI.log = logger
     logger.remove()
     yield
@@ -40,9 +40,11 @@ def test_cli_abort(cli, capsys):
 @pytest.mark.parametrize(["reply", "expected"], [
     ("y", True),
     ("Y", True),
+    ("yes", True),
+    ("yes ", True),
+    ("yes please", False),
     ("n", False),
     ("q", False),
-    ("yes", False),
 ])
 def test_cli_confirm(cli, monkeypatch, reply, expected):
     with monkeypatch.context() as m:

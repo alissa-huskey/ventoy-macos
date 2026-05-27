@@ -46,10 +46,10 @@ class Builder(Object):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        """Builder(disk='device')."""
+        """Builder(disk='location')."""
         text = ""
-        if (device := getattr(self.disk, "device", "")):
-            text = f"disk='{device}'"
+        if self.disk:
+            text = "disk=" + repr(self.disk)
 
         return f"Builder({text})"
 
@@ -158,7 +158,7 @@ class Builder(Object):
         """Unmount disk and wait for it to finish."""
         if not self.disk:
             return
-        logger.info(f"Unmounting disk: {self.disk.device}")
+        logger.info(f"Unmounting disk: {self.disk.location}")
         self.disk.unmount()
         sleep(self.PAUSE)
 

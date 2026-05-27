@@ -26,14 +26,14 @@ def planned_layout():
         Partition(
             number=1,
             name="Ventoy",
-            format="exFAT",
+            fs="exFAT",
             start=2048,
             end=124934423,
         ),
         Partition(
             number=2,
             name="VTOYEFI",
-            format="FAT16",
+            fs="FAT16",
             start=124934424,
             end=124999959,
         ),
@@ -44,6 +44,6 @@ def planned_layout():
 def fake_disk(fs):
     """Return a Disk object that exists on a fake filesystem."""
     disk = Disk("/dev/disk67")
-    fs.create_file(disk.raw_device, contents=ascii_lowercase + "x" * 512)
+    fs.create_file(disk.raw_location, contents=ascii_lowercase + "x" * 512)
 
     return disk
