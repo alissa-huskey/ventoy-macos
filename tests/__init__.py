@@ -35,7 +35,7 @@ def copy_fixture(name: str, dest: Path) -> Path:
     Returns:
         Path to copied file or directory
     """
-    fixtures = Path(__file__).parent / "fixtures"
+    fixtures = Path(__file__).parent / "data"
     source = fixtures / name
     path = dest / name
 

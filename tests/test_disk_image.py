@@ -28,14 +28,14 @@ def test_disk_image_dest():
     assert img.dest.path == path / "core.img"
 
 
-def test_disk_image_data(fixtures_path):
-    path = (fixtures_path / "fake_images" / "boot.img")
+def test_disk_image_data(shared_datadir):
+    path = (shared_datadir / "fake_images" / "boot.img")
     img = DiskImage(name="boot", dest=path)
     assert img.data == b"boot img\n"
 
 
-def test_disk_image_size(fixtures_path):
-    path = (fixtures_path / "fake_images" / "boot.img")
+def test_disk_image_size(shared_datadir):
+    path = (shared_datadir / "fake_images" / "boot.img")
     img = DiskImage(name="boot", dest=path)
     assert img.size == 9
 
@@ -45,9 +45,9 @@ def test_disk_image_size(fixtures_path):
     ("boot", "boot.img"),
     ("ventoy", "ventoy.disk.img.xz"),
 ])
-def test_disk_image_decompress(tmp_path, fixtures_path, relpath):
+def test_disk_image_decompress(tmp_path, shared_datadir, relpath):
     img = DiskImage(
-        source_dir=(fixtures_path / "ventoy-1.1.12"),
+        source_dir=(shared_datadir / "ventoy-1.1.12"),
         dest_dir=tmp_path,
         relpath=relpath,
     )

@@ -42,9 +42,9 @@ def test_app_workdir():
     assert app.workdir == Path("/tmp")
 
 
-def test_app_images(fixtures_path):
+def test_app_images(shared_datadir):
     app = App(
-        downloader=Stub(ventoy_dir=(fixtures_path / "fake_images")),
+        downloader=Stub(ventoy_dir=(shared_datadir / "fake_images")),
         workdir="/tmp"
     )
 

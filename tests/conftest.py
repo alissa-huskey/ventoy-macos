@@ -17,12 +17,6 @@ def sectors_64g():
 
 
 @pytest.fixture
-def fixtures_path() -> Path:
-    """Return the path to the fixtures directory."""
-    return Path(__file__).parent / "fixtures"
-
-
-@pytest.fixture
 def planned_layout():
     """Planned partition layout for a 64G drive."""
     return [
