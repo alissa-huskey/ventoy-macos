@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tests import Stub, noop
+from tests import Stub, noop, noop_context, return_false, return_true
 from ventoy_macos import Abort
 from ventoy_macos import cli as cli_module
 from ventoy_macos.cli import CLI
@@ -11,22 +11,6 @@ from ventoy_macos.common import g2s
 from ventoy_macos.disk import Disk
 
 bp = breakpoint
-
-
-def return_true(*a, **k):
-    """Return True."""
-    return True
-
-
-def return_false(*a, **k):
-    """Return False."""
-    return False
-
-
-@contextmanager
-def noop_context(*a, **k):
-    """Do nothing, as a context manager."""
-    yield
 
 
 class BuilderStub(Stub):
@@ -92,30 +76,34 @@ def app_stub(tmp_path, disk_stub):
         version="1.1.11",
         disk=disk_stub,
         chmod=noop,
-        workdir=tmp_path,
-        images={
-          "boot.img": Stub(
-            dest=Stub(exists=return_true, path=Stub(name="boot.img")),
+        workdir=Stub(
+            chmod=noop,
             decompress=noop,
-            size=512,
-          ),
-        },
-        downloader=Stub(
-            url="https://github.com/...",
-            request=lambda *a: Stub(ok=True),
-            ventoy_dir=Stub(is_dir=return_true),
-            tarball_path=Stub(is_file=return_true),
             download=noop,
             extract=noop,
+            has_images=return_false,
+            path=tmp_path,
+            request=lambda *a: Stub(ok=True),
+            tarball_path=Stub(is_file=return_true),
+            url="https://github.com/...",
+            ventoy_dir=Stub(is_dir=return_true),
+            version="1.1.11",
+            images={
+                "boot_img": Stub(
+                    dest=Stub(exists=return_true, path=Stub(name="boot.img")),
+                    decompress=noop,
+                    size=512,
+                ),
+            },
         ),
     )
 
 
 @pytest.fixture()
 def mock_get_latest(monkeypatch):
-    """Mock Downloader.get_latest()."""
+    """Mock dir.get_latest()."""
     with monkeypatch.context() as m:
-        m.setattr(cli_module.Downloader, "get_latest", noop)
+        m.setattr(cli_module.Workdir, "get_latest", noop)
         yield
 
 
@@ -185,27 +173,22 @@ def test_cli_validate_sys_no_xzcat(monkeypatch, assert_abort):
             cli.validate_sys()
 
 
-def test_cli_validate_sys_invalid_workdir(monkeypatch, assert_abort):
+def test_cli_validate_sys_invalid_workdir(monkeypatch, assert_abort, cli):
     with monkeypatch.context() as m:
         m.setattr(cli_module, "geteuid", lambda: 0)
         m.setattr("sys.platform", "darwin")
-
-        cli = CLI()
-        cli.app = Stub(workdir=Path("xxxxxxxxx"))
-        cli.has = lambda self: True
+        m.setattr(cli.app.workdir, "path", Path("xxxxxxxxx"))
+        m.setattr(cli, "has", return_true)
 
         with assert_abort("Invalid working directory"):
             cli.validate_sys()
 
 
-def test_cli_validate_sys(monkeypatch, tmp_path):
+def test_cli_validate_sys(monkeypatch, tmp_path, cli):
     with monkeypatch.context() as m:
         m.setattr(cli_module, "geteuid", lambda: 0)
         m.setattr("sys.platform", "darwin")
-
-        cli = CLI()
-        cli.app = Stub(workdir=tmp_path)
-        cli.has = lambda self: True
+        m.setattr(cli, "has", return_true)
 
         assert cli.validate_sys()
 
@@ -290,6 +273,7 @@ def test_cli_get_ventoy_with_disk_images(mock_get_latest, capsys, cli):
     THEN: it should say that it's using those disk images
     AND: it should return True
     """
+    cli.app.workdir.has_images = return_true
     result = cli.get_ventoy()
     output = capsys.readouterr().out
 
@@ -306,7 +290,7 @@ def test_cli_get_ventoy_without_disk_images(mock_get_latest, capsys, cli):
     AND: it should decompress those images (at some point)
     AND: it should return True
     """
-    cli.app.images["boot.img"].dest.exists = return_false
+    cli.app.workdir.has_images = return_false
     result = cli.get_ventoy()
     output = capsys.readouterr().out
 
@@ -326,7 +310,7 @@ def test_cli_get_ventoy_with_ventoy_dir(mock_get_latest, capsys, cli):
     AND: it should decompress the disk images
     AND: it should return True
     """
-    cli.app.images["boot.img"].dest.exists = return_false
+    cli.app.workdir.has_images = return_false
     result = cli.get_ventoy()
     output = capsys.readouterr().out
 
@@ -346,8 +330,8 @@ def test_cli_get_ventoy_without_ventoy_dir(mock_get_latest, capsys, cli):
     AND: it should decompress the disk images
     AND: it should return True
     """
-    cli.app.images["boot.img"].dest.exists = return_false
-    cli.app.downloader.ventoy_dir.is_dir = return_false
+    cli.app.workdir.has_images = return_false
+    cli.app.workdir.ventoy_dir.is_dir = return_false
 
     result = cli.get_ventoy()
     output = capsys.readouterr().out
@@ -372,9 +356,9 @@ def test_cli_get_ventoy_without_tarball(mock_get_latest, capsys, cli):
     AND: it should decompress the disk images
     AND: it should return True
     """
-    cli.app.downloader.tarball_path.is_file = return_false
-    cli.app.images["boot.img"].dest.exists = return_false
-    cli.app.downloader.ventoy_dir.is_dir = return_false
+    cli.app.workdir.tarball_path.is_file = return_false
+    cli.app.workdir.has_images = return_false
+    cli.app.workdir.ventoy_dir.is_dir = return_false
 
     result = cli.get_ventoy()
     output = capsys.readouterr().out
@@ -401,9 +385,9 @@ def test_cli_get_ventoy_with_tarball(mock_get_latest, capsys, cli):
     AND: it should decompress the disk images
     AND: it should return True
     """
-    cli.app.downloader.tarball_path.is_file = return_true
-    cli.app.images["boot.img"].dest.exists = return_false
-    cli.app.downloader.ventoy_dir.is_dir = return_false
+    cli.app.workdir.tarball_path.is_file = return_true
+    cli.app.workdir.has_images = return_false
+    cli.app.workdir.ventoy_dir.is_dir = return_false
 
     result = cli.get_ventoy()
     output = capsys.readouterr().out

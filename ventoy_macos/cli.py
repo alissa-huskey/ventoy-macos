@@ -22,10 +22,10 @@ from ventoy_macos import Abort, VentoyMacosWriteError
 from ventoy_macos._exclude import EXCLUDE
 from ventoy_macos.app import App
 from ventoy_macos.common import b2s, run, s2b, size_text
-from ventoy_macos.downloader import Downloader
 from ventoy_macos.logger import Logger, log_catch
 from ventoy_macos.object import Object
 from ventoy_macos.rule import Rule
+from ventoy_macos.workdir import Workdir
 
 rich_tracebacks(show_locals=True, suppress=EXCLUDE)
 
@@ -408,19 +408,22 @@ class CLI(Object):
         sudo ventoy-macos /dev/disk4 --ventoy-version 1.1.10
             """,
         )
-        parser.add_argument("disk", help="Target disk device (e.g., /dev/disk4)")
         parser.add_argument(
-            "--ventoy-version",
+            "disk",
+            help="Target disk device (e.g., /dev/disk4)",
+        )
+        parser.add_argument(
+            "-V", "--ventoy-version",
             default=None,
             help="Ventoy version to install (default: latest)",
         )
         parser.add_argument(
-            "--work-dir",
+            "-d", "--dir",
             default=None,
             help="Working directory for downloads (default: temp directory)",
         )
         parser.add_argument(
-            "--debug",
+            "-D", "--debug",
             default=False,
             action="store_true",
             help="Print tracebacks.",
@@ -448,7 +451,7 @@ class CLI(Object):
                 "Install it with: brew install xz"
             )
 
-        if not self.app.workdir.is_dir():
+        if not self.app.workdir.path.is_dir():
             raise Abort(
                 f"Invalid working directory: {self.app.workdir}"
             )
@@ -488,10 +491,12 @@ class CLI(Object):
         """Download and extract Ventoy."""
         self.print(self.header("Collecting Ventoy disk images"), before=1, after=1)
 
+        workdir = self.app.workdir
+
         if not self.app.version:
             if self.confirm("Request latest Ventoy release number?", persist=False):
                 with self.status("Fetching version"):
-                    self.app.version = Downloader.get_latest()
+                    self.app.version = Workdir.get_latest()
             else:
                 self.print(
                     "Ok. Use the --ventoy-version option next time.",
@@ -500,27 +505,25 @@ class CLI(Object):
                 )
                 exit()
 
-        downloader = self.app.downloader
-
         # skip everything if there are already disk images
-        if all([i.dest.exists() for i in self.app.images.values()]):
-            self.done(f"Using Ventoy disk images in {self.app.workdir}")
-            self.app.chmod()
+        if workdir.has_images():
+            self.done(f"Using Ventoy disk images in {workdir.path}")
+            workdir.chmod()
             return True
 
         # if there's already a ventoy dir, skip to decompress
-        if downloader.ventoy_dir.is_dir():
-            self.done(f"Using Ventoy dir in {self.app.workdir}")
+        if workdir.ventoy_dir.is_dir():
+            self.done(f"Using Ventoy dir in {workdir.path}")
         else:
 
             # skip downloading the tarball if it already exists
-            if downloader.tarball_path.is_file():
-                self.done(f"Using Ventoy tarball in {self.app.workdir}")
+            if workdir.tarball_path.is_file():
+                self.done(f"Using Ventoy tarball in {workdir.path}")
             else:
                 if not self.confirm("Download Ventoy?", persist=False):
                     self.print(
                         (
-                            "Ok. Next time use --work-dir to "
+                            "Ok. Next time use --dir to "
                             "point to your local downloads.",
                         ),
                         before=1,
@@ -528,18 +531,17 @@ class CLI(Object):
                     )
                     exit()
 
-                with self.status(f"Downloading: {downloader.url}"):
-                    downloader.download()
+                with self.status(f"Downloading: {workdir.url}"):
+                    workdir.download()
 
             with self.status("Extracting Ventoy package"):
-                downloader.extract()
+                workdir.extract()
 
         with self.status("Decompressing disk images"):
-            for img in self.app.images.values():
-                img.decompress()
+            workdir.decompress()
 
         # give user rw access to all files in workdir
-        self.app.chmod()
+        workdir.chmod()
 
         return True
 
@@ -776,7 +778,7 @@ class CLI(Object):
                 ("Boot Images", ""),
                 *[
                     (img.dest.path.name, f"{img.size} bytes")
-                    for img in self.app.images.values()
+                    for img in self.app.workdir.images.values()
                 ],
             ]),
             expand=False,
@@ -790,6 +792,7 @@ class CLI(Object):
         self.parse_args()
 
         self.app = App(self.args)
+        self.app.workdir.mkdirs()
         self.disk = self.app.disk
         self.log = self.app.log
         self.log_start()
@@ -884,7 +887,7 @@ def main():
 
         else:
             # otherwise print a shorter and prettier error message
-            cli.error(
+            cli.err(
                 "Something went wrong unexpectedly.",
                 f"{e.__class__.__name__}: {e}",
                 "See the log for more details",

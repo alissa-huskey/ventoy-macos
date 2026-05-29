@@ -31,3 +31,8 @@ x 2026-05-28 2026-05-23 Write real tests for CLI.
 x 2026-05-29 2026-05-28 @housekeeping Add tests for rich-related CLI functions to tests_cli_io.py
 x 2026-05-29 2026-05-28 @housekeephng use @pytest.mark.usefixtures for contextmanager functions that should be fixtures
 x 2026-05-29 2026-05-28 @housekeeping Use pytest-datadir
+x 2026-05-29 2026-05-29 Workdir: add .has_images() or somesuch
+x 2026-05-29 2026-05-29 Rename Workdir.workdir -> Workdir.path
+x 2026-05-29 2026-05-29 move .chmod() from App -> Workdir @maybe
+x 2026-05-29 2026-05-29 mkdir() and mkdtemp() in Workdir not App
+x 2026-05-29 2026-05-29 App.workdir: try to make it a Workdir object (see where it is used and if relevant Path methods can be added to Workdir)

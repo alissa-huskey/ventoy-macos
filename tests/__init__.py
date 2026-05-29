@@ -1,4 +1,5 @@
 """Ventoy for macOS."""
+from contextlib import contextmanager
 from pathlib import Path
 from shutil import copy, copytree
 
@@ -49,3 +50,19 @@ def copy_fixture(name: str, dest: Path) -> Path:
     copier(source, path)
 
     return path
+
+
+def return_true(*a, **k):
+    """Return True."""
+    return True
+
+
+def return_false(*a, **k):
+    """Return False."""
+    return False
+
+
+@contextmanager
+def noop_context(*a, **k):
+    """Do nothing, as a context manager."""
+    yield
