@@ -27,3 +27,6 @@ x 2026-05-27 2026-05-24 Partition: refactor to store all diskutil list info and 
 x 2026-05-27 2026-05-23 @refactor Move partition1 definition from CLI -> Disk
 x 2026-05-27 2026-05-24 Add a Layout/Table/Partitions class
 x 2026-05-27 2026-05-20 @feature Disk: Add .file_system
+x 2026-05-28 2026-05-23 Write real tests for CLI.
+x 2026-05-29 2026-05-28 @housekeeping Add tests for rich-related CLI functions to tests_cli_io.py
+x 2026-05-29 2026-05-28 @housekeephng use @pytest.mark.usefixtures for contextmanager functions that should be fixtures

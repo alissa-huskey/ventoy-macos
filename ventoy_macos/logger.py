@@ -21,10 +21,12 @@ class Logger(Object):
 
     LINE_CHR = "─"
 
+    ENABLE = True
+
     @attr
     def path(self) -> Path:
         """Return the path to the log."""
-        if not self._path:
+        if not self._path and self.ENABLE:
             _, file = tempfile.mkstemp()
             print(f"\033[3mTemp log file created at: {file}\033[0m")
             self._path = Path(file)
@@ -33,15 +35,16 @@ class Logger(Object):
     @cached_property
     def _logger(self) -> LoguruLogger:
         """Return a python Logger instance."""
-        if self.path.is_dir():
-            raise VentoyMacosError("Cannot log to dir: {self.path}")
-
         try:
             logger.remove()
         except ValueError:
             ...
 
-        logger.add(self.path, level="INFO", colorize=True)
+        if self.ENABLE:
+            if self.path.is_dir():
+                raise VentoyMacosError("Cannot log to dir: {self.path}")
+
+            logger.add(self.path, level="INFO", colorize=True)
 
         return logger
 

@@ -40,7 +40,7 @@ class Rule(RichRule):
         """Return the line characters (corrected for ascii_only mode)."""
         return (
             "-"
-            if (options.ascii_only and not self.characters.isascii())
+            if (getattr(options, "ascii_only", False) and not self.characters.isascii())
             else self.characters
         )
 
@@ -56,12 +56,13 @@ class Rule(RichRule):
         return title_text
 
     def __rich_console__(
-        self, console: Console, options: ConsoleOptions
+        self, console: Console, options: ConsoleOptions = None
     ) -> RenderResult:
         """Extend the line before/after the title for left/right aligned rules."""
-        width = self.width or options.max_width
+        width = self.width or getattr(options, "max_width", console.width)
         chars = self.chars(options)
         chars_len = cell_len(chars)
+        options = None or console.options
 
         if not self.title:
             yield self._rule_line(chars_len, width)

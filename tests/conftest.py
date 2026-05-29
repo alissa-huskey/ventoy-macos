@@ -3,8 +3,11 @@ from string import ascii_lowercase
 
 import pytest
 
+from ventoy_macos import logger as logger_module
 from ventoy_macos.disk import Disk
 from ventoy_macos.partition import Partition
+
+bp = breakpoint
 
 
 @pytest.fixture
@@ -47,3 +50,18 @@ def fake_disk(fs):
     fs.create_file(disk.raw_location, contents=ascii_lowercase + "x" * 512)
 
     return disk
+
+
+@pytest.fixture
+def markers(request):
+    """Return a list of marker names for the currently running test."""
+    return [m.name for m in request.node.iter_markers()]
+
+
+@pytest.fixture(autouse=True)
+def disable_logger(monkeypatch, markers):
+    """Ensure logs don't print to stdout or workdir."""
+    with monkeypatch.context() as m:
+        if "enable_logging" not in markers:
+            m.setattr(logger_module.Logger, "ENABLE", False)
+        yield

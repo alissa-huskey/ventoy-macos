@@ -4,7 +4,6 @@
 (Z) 2026-05-23 @feature Rule: Add title_style kwarg
 (C) 2026-05-23 @refactor Add some way to use last downloaded dir
 (C) 2026-05-23 @quality common.py:run(): add error handling
-(C) 2026-05-23 Write real tests for CLI.
 (B) 2026-05-24 Verify that partition layouts are the same using the orig script.
 (Z) 2026-05-24 Add --no-op mode (have FD and run() look at it, that should skip most operations I think)
 (Z) 2026-05-24 Add --pdb flag to enter debugger on exception
@@ -15,3 +14,6 @@
 (Z) 2026-05-25 Add to Disk.verify()
 (A) 2026-05-26 Test to make sure ventoy disk actually boots.
 2026-05-27 Get the version from working director if possible
+2026-05-28 @housekeeping Use pytest-datadir
+2026-05-28 @housekeeping investigate pytest-loguru: https://pypi.org/project/pytest-loguru/
+2026-05-28 @refactor Consider splitting out io related logic to io.py or soemthing.

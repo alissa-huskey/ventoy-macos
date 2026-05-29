@@ -65,10 +65,12 @@ class Device(Object):
 
         return (is_removable and not is_internal)
 
-    @cached_property
+    @attr
     def scheme(self) -> str:
         """Return the partition table scheme."""
-        return self.info_get("Content") or ""
+        if not self._scheme:
+            self._scheme = self.info_get("Content") or ""
+        return self._scheme
 
     @attr
     def size(self) -> int:

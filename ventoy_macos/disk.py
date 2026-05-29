@@ -5,6 +5,8 @@ import subprocess
 from functools import cached_property
 from re import compile as re_compile
 
+from attr import attr, hasattrs
+
 from ventoy_macos import SECTOR_SIZE as _SECTOR_SIZE
 from ventoy_macos import VentoyMacosError
 from ventoy_macos.device import Device
@@ -13,6 +15,7 @@ from ventoy_macos.partition import Partition
 bp = breakpoint
 
 
+@hasattrs
 class Disk(Device):
     """A disk object."""
 
@@ -50,18 +53,21 @@ class Disk(Device):
             return []
         return info.get("Partitions", [])
 
-    @property
+    @attr
     def partitions(self):
         """Return the current partition layout."""
-        layout = []
+        if self._partitions is None:
+            layout = []
 
-        for i, part in enumerate(self.list, 1):
-            id = part.get("DeviceIdentifier", "")
-            if not id:
-                raise VentoyMacosError("No partition id for this partition.")
+            for i, part in enumerate(self.list, 1):
+                id = part.get("DeviceIdentifier", "")
+                if not id:
+                    raise VentoyMacosError("No partition id for this partition.")
 
-            layout.append(Partition(f"/dev/{id}", number=i, parent=self))
-        return layout
+                layout.append(Partition(f"/dev/{id}", number=i, parent=self))
+            self._partitions = layout
+
+        return self._partitions
 
     @cached_property
     def planned_layout(self):

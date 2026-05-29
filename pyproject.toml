@@ -35,6 +35,7 @@ pyfakefs = "^6.2.0"
 [tool.pytest.ini_options]
 addopts = "-xv"
 testpaths = "tests"
+markers = [ "enable_logging" ]
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,4 +1,4 @@
-"""CLI."""
+"""CLTableI."""
 
 import sys
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
@@ -24,6 +24,7 @@ from ventoy_macos.app import App
 from ventoy_macos.common import b2s, run, s2b, size_text
 from ventoy_macos.downloader import Downloader
 from ventoy_macos.logger import Logger, log_catch
+from ventoy_macos.object import Object
 from ventoy_macos.rule import Rule
 
 rich_tracebacks(show_locals=True, suppress=EXCLUDE)
@@ -32,7 +33,7 @@ bp = breakpoint
 
 
 @hasattrs
-class CLI():
+class CLI(Object):
     """Everything that prints or receives input from the user."""
 
     screen = Control()
@@ -40,8 +41,6 @@ class CLI():
     stderr = Console(stderr=True)
 
     enable_interactive = None
-
-    SECONDS = 1
 
     app = None
 
@@ -297,7 +296,7 @@ class CLI():
         """Return a rich table object with no lines, headers or footers.
 
         Arguments:
-            rows (list[iter]): a row of (name, value) iterables
+            rows (list[iter]): a list of (name, value) row iterables
             columns (dict, optional): a dictionary of (column_number ->
                 options) to pass to `.add_column()`.
         """
@@ -460,6 +459,8 @@ class CLI():
                 f"Invalid working directory: {self.app.workdir}"
             )
 
+        return True
+
     def validate_disk(self):
         """Check disk requirements."""
         # disk must exist and start with /dev/disk
@@ -487,6 +488,8 @@ class CLI():
                 prefix=":prohibited:",
             )
 
+        return True
+
     def get_ventoy(self):
         """Download and extract Ventoy."""
         self.print(self.header("Collecting Ventoy disk images"), before=1, after=1)
@@ -509,7 +512,7 @@ class CLI():
         if all([i.dest.exists() for i in self.app.images.values()]):
             self.done(f"Using Ventoy disk images in {self.app.workdir}")
             self.app.chmod()
-            return
+            return True
 
         # if there's already a ventoy dir, skip to decompress
         if downloader.ventoy_dir.is_dir():
@@ -518,7 +521,7 @@ class CLI():
 
             # skip downloading the tarball if it already exists
             if downloader.tarball_path.is_file():
-                self.done(f"Using Ventroy tarball in {self.app.workdir}")
+                self.done(f"Using Ventoy tarball in {self.app.workdir}")
             else:
                 if not self.confirm("Download Ventoy?", persist=False):
                     self.print(
@@ -544,13 +547,15 @@ class CLI():
         # give user rw access to all files in workdir
         self.app.chmod()
 
+        return True
+
     def show_disk_info(self):
         """Print the disk details and layout."""
         panel = self.panel(
             "Target disk",
             self.info_grid([
                 ("Name:", self.disk.name or ""),
-                ("Partition Scheme:", self.disk.fs or ""),
+                ("Partition Scheme:", self.disk.scheme or ""),
                 ("Location:", self.disk.location),
                 ("Disk size:", f"{self.disk.gb:.1f} GiB ({self.disk.sectors} sectors)")
             ]),
@@ -581,8 +586,8 @@ class CLI():
             "Planned Layout",
             self.disk.planned_layout,
             ["Sectors"],
-            lambda part: [f"[{part.start}-{part.start}]"],
-            print=True
+            lambda part: [f"[{part.end}-{part.start}]"],
+            print=True,
         )
 
     def write_to_disk(self):
@@ -690,6 +695,8 @@ class CLI():
             self.pause()
             part.format()
 
+        return True
+
     def verify(self):
         """Print final disk layout and verify partition 1 offset."""
         with self.status("Verifying disk"):
@@ -736,7 +743,7 @@ class CLI():
             "Ventoy Disk",
             self.info_grid([
                 ("Name:", self.disk.name or ""),
-                ("Partition Scheme:", self.disk.fs or ""),
+                ("Partition Scheme:", self.disk.scheme or ""),
                 ("Location:", self.disk.location),
                 ("Disk size:", f"{self.disk.gb:.1f} GiB ({self.disk.sectors} sectors)"),
             ]),
@@ -761,6 +768,8 @@ class CLI():
             style="dim",
         )
 
+        return True
+
     def show_ventoy_info(self):
         """Print ventoy info panel."""
         panel = self.panel(
@@ -779,6 +788,7 @@ class CLI():
             expand=False,
         )
         self.print(panel)
+        return True
 
     @log_catch(reraise=True)
     def run(self):

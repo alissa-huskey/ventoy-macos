@@ -3,6 +3,8 @@ from loguru._logger import Logger as LoguruLogger
 
 from ventoy_macos.logger import Logger
 
+pytestmark = pytest.mark.enable_logging
+
 bp = breakpoint
 
 
