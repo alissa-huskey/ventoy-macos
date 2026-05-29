@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from tests import Stub, noop
+from ventoy_macos import Abort
 from ventoy_macos import cli as cli_module
 from ventoy_macos.cli import CLI
 from ventoy_macos.common import g2s
@@ -46,12 +47,14 @@ class BuilderStub(Stub):
 
 @pytest.fixture
 def assert_abort():
-    """Assert that the operation calls abort()."""
+    """Assert that the operation calls an Abort exception."""
     @contextmanager
-    def wrapper():
-        with pytest.raises(SystemExit) as e:
+    def wrapper(message: str = None):
+        with pytest.raises(Abort) as e:
             yield
-            assert e.value.code == 1
+        ex = e.value
+        if message:
+            assert message in str(ex)
 
     return wrapper
 
@@ -155,7 +158,7 @@ def test_cli_disk_layout(capsys, planned_layout):
 
 
 def test_cli_validate_sys_not_sudo(assert_abort):
-    with assert_abort():
+    with assert_abort("must be run as root"):
         cli = CLI()
         cli.validate_sys()
 
@@ -165,7 +168,7 @@ def test_cli_validate_sys_not_macos(monkeypatch, assert_abort):
         m.setattr(cli_module, "geteuid", lambda: 0)
         m.setattr("sys.platform", "windows")
 
-        with assert_abort():
+        with assert_abort("for macOS only"):
             cli = CLI()
             cli.validate_sys()
 
@@ -178,7 +181,7 @@ def test_cli_validate_sys_no_xzcat(monkeypatch, assert_abort):
         cli = CLI()
         cli.has = lambda self: False
 
-        with assert_abort():
+        with assert_abort("xz is required"):
             cli.validate_sys()
 
 
@@ -191,7 +194,7 @@ def test_cli_validate_sys_invalid_workdir(monkeypatch, assert_abort):
         cli.app = Stub(workdir=Path("xxxxxxxxx"))
         cli.has = lambda self: True
 
-        with assert_abort():
+        with assert_abort("Invalid working directory"):
             cli.validate_sys()
 
 
@@ -208,26 +211,26 @@ def test_cli_validate_sys(monkeypatch, tmp_path):
 
 
 def test_cli_validate_disk_not_disk(assert_abort):
-    with assert_abort():
+    with assert_abort("Device invalid or not mounted"):
         cli = CLI()
         cli.disk = Stub(is_disk=lambda: False)
         cli.validate_disk()
 
 
 def test_cli_validate_disk_not_external(assert_abort):
-    with assert_abort():
+    with assert_abort("must be removable and external"):
         cli = CLI()
         cli.disk = Stub(is_disk=lambda: True, is_external=lambda: False)
         cli.validate_disk()
 
 
 def test_cli_validate_disk_system_disk(assert_abort):
-    with assert_abort():
+    with assert_abort("likely a system disk"):
         cli = CLI()
         cli.disk = Stub(
             is_disk=lambda: True,
-            is_external=lambda: False,
-            is_system_disk=True,
+            is_external=lambda: True,
+            is_system_disk=lambda: True,
         )
         cli.validate_disk()
 

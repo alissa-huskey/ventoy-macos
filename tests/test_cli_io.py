@@ -30,11 +30,6 @@ def test_cli_err(cli, capsys):
     assert "Goodbye" in output
 
 
-def test_cli_abort(cli, capsys):
-    with pytest.raises(SystemExit):
-        cli.abort("Goodbye")
-
-
 @pytest.mark.parametrize(["reply", "expected"], [
     ("y", True),
     ("Y", True),

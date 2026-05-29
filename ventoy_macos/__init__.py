@@ -8,6 +8,7 @@ class VentoyMacosError(Exception):
 
     def __init__(self, *args, **kwargs):
         """Initialize."""
+        self.kwargs = kwargs
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -16,3 +17,7 @@ class VentoyMacosError(Exception):
 
 class VentoyMacosWriteError(VentoyMacosError):
     """Failure during disk write operations."""
+
+
+class Abort(VentoyMacosError):
+    """User errors."""

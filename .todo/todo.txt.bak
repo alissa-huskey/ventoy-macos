@@ -14,6 +14,5 @@
 (Z) 2026-05-25 Add to Disk.verify()
 (A) 2026-05-26 Test to make sure ventoy disk actually boots.
 2026-05-27 Get the version from working director if possible
-x 2026-05-29 2026-05-28 @housekeeping Use pytest-datadir
-2026-05-28 @housekeeping investigate pytest-loguru: https://pypi.org/project/pytest-loguru/
-2026-05-28 @refactor Consider splitting out io related logic to io.py or soemthing.
+(Z) 2026-05-28 @housekeeping investigate pytest-loguru: https://pypi.org/project/pytest-loguru/
+(C) 2026-05-28 @refactor Consider splitting out io related logic to io.py or soemthing.

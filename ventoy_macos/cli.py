@@ -18,7 +18,7 @@ from rich.table import Table
 from rich.text import Text
 from rich.traceback import install as rich_tracebacks
 
-from ventoy_macos import VentoyMacosWriteError
+from ventoy_macos import Abort, VentoyMacosWriteError
 from ventoy_macos._exclude import EXCLUDE
 from ventoy_macos.app import App
 from ventoy_macos.common import b2s, run, s2b, size_text
@@ -175,12 +175,6 @@ class CLI(Object):
         spaces = Text.from_markup(prefix).cell_len + 1
         for line in lines:
             self.stderr.print(" " * spaces + line, style="dim")
-
-    def abort(self, *message, **kwargs):
-        """Print an error message and exit."""
-        self.log.critical("\n".join(message))
-        self.err(*message, **kwargs)
-        sys.exit(1)
 
     def done(self, task):
         """Print a task with a checkmark."""
@@ -439,23 +433,23 @@ class CLI(Object):
     def validate_sys(self):
         """Check system requirements."""
         if geteuid() != 0:
-            self.abort(
+            raise Abort(
                 "This script must be run as root.",
                 r"Use: sudo ventoy-macos \[...]",
                 prefix=":locked:",
             )
 
         if sys.platform != "darwin":
-            self.abort("This script is designed for macOS only.")
+            raise Abort("This script is designed for macOS only.")
 
         if not self.has("xzcat"):
-            self.abort(
+            raise Abort(
                 "xz is required but not found.",
                 "Install it with: brew install xz"
             )
 
         if not self.app.workdir.is_dir():
-            self.abort(
+            raise Abort(
                 f"Invalid working directory: {self.app.workdir}"
             )
 
@@ -465,14 +459,14 @@ class CLI(Object):
         """Check disk requirements."""
         # disk must exist and start with /dev/disk
         if not self.disk.is_disk():
-            self.abort(
+            raise Abort(
                 f"Device invalid or not mounted: {self.disk}",
                 '(Hint: must start with "/dev/disk".)'
             )
 
         # must be removable and external
         if not self.disk.is_external():
-            self.abort(
+            raise Abort(
                 "Refusing to operate on {self.disk.location}",
                 "(It must be removable and external.)",
                 prefix=":prohibited:",
@@ -482,7 +476,7 @@ class CLI(Object):
         # (this should be caught by the above,
         # but it can't hurt to double check)
         if self.disk.is_system_disk():
-            self.abort(
+            raise Abort(
                 "Refusing to operate on {self.disk.location}",
                 "(It is likely a system disk.)",
                 prefix=":prohibited:",
@@ -680,7 +674,7 @@ class CLI(Object):
             part = self.disk.partitions[0]
         except IndexError:
             self.line()
-            self.abort(
+            raise Abort(
                 "Install failed.",
                 f"There are no partitions on disk {self.disk.location}.",
                 prefix="  :x:",
@@ -709,7 +703,7 @@ class CLI(Object):
             partition = self.disk.partitions[0]
         except IndexError:
             self.line()
-            self.abort(
+            raise Abort(
                 "Install failed.",
                 f"There are no partitions on disk {self.disk.location}.",
                 prefix="  :x:",
@@ -717,7 +711,7 @@ class CLI(Object):
 
         if partition.offset != s2b(2048):
             self.line()
-            self.abort(
+            raise Abort(
                 "Ventoy disk is corrupted",
                 "Partition 1 does not start at sector 2048.",
                 prefix="  :x:",
@@ -861,6 +855,13 @@ def main():
         cli.ec = 0
         print()
 
+    # user errors
+    except Abort as e:
+        cli.ec = 1
+        cli.log.error("\n".join(e.args))
+        cli.err(*e.args, **e.kwargs)
+        exit(2)
+
     except VentoyMacosWriteError as e:
         cli.ec = 1
         cli.line(2)
@@ -883,7 +884,7 @@ def main():
 
         else:
             # otherwise print a shorter and prettier error message
-            cli.abort(
+            cli.error(
                 "Something went wrong unexpectedly.",
                 f"{e.__class__.__name__}: {e}",
                 "See the log for more details",
