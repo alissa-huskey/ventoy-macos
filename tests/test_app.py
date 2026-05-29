@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from tests import Stub
 from ventoy_macos.app import App, Workdir
 from ventoy_macos.disk import Disk
@@ -12,15 +14,17 @@ def test_app():
 def test_app_workdir():
     app = App(Stub(dir=str("/tmp")))
 
-    assert app.workdir == Workdir(path="/tmp")
+    assert app.workdir and app.workdir.base == Path("/tmp")
 
 
 def test_app_workdir_null(monkeypatch, tmp_path):
     with monkeypatch.context() as m:
         m.setattr(Workdir, "TMPDIR", tmp_path)
 
-        app = App()
-        assert app.workdir == Workdir()
+        app = App(mktemp=False)
+
+        assert isinstance(app.workdir, Workdir)
+        assert app.workdir.base is None
 
 
 def test_app_disk():

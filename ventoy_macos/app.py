@@ -35,9 +35,10 @@ class App(Object):
         "args": None,
     }
 
-    def __init__(self, args: Namespace = None, **kwargs):
+    def __init__(self, args: Namespace = None, mktemp: bool = True, **kwargs):
         """Initialize object."""
         self.args = args
+        self.mktemp = mktemp
         super().__init__(**kwargs)
 
     @cached_property
@@ -50,8 +51,9 @@ class App(Object):
         """Return the directory to save and extract working files from."""
         if not self._workdir:
             self._workdir = Workdir(
-                path=(self.args and self.args.dir or None),
+                (self.args and self.args.dir or None),
                 version=self.version,
+                mktemp=self.mktemp,
             )
         return self._workdir
 

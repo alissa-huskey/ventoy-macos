@@ -3,6 +3,7 @@
 import tempfile
 from os import chmod
 from pathlib import Path
+from re import compile as re_compile
 from stat import S_IMODE
 
 import requests
@@ -24,6 +25,8 @@ class Workdir(Object):
     and extracting Ventoy.
     """
 
+    VERSION_MATCHER = re_compile(r"^\d+[.]\d+[.]\d+")
+
     IMAGES_RELDIRS = {
         "boot": ("boot", "boot.img"),
         "core": ("boot", "core.img.xz"),
@@ -44,6 +47,13 @@ class Workdir(Object):
     }
 
     TMPDIR = None
+
+    def __init__(self, base: Path = None, mktemp: bool = False, **kwargs):
+        """Initialize."""
+        super().__init__(base=base, **kwargs)
+
+        if mktemp:
+            self.mktemp()
 
     def __str__(self):
         """Return the human readable path."""
@@ -71,13 +81,28 @@ class Workdir(Object):
         return self._images
 
     @attr(method="setter")
-    def path(self, value):
-        """Return the path to the working dir."""
+    def base(self, value):
+        """Return the path to the base working dir."""
         if not value:
             return
         if not isinstance(value, Path):
             value = Path(value)
-        self._path = value
+
+        # detect if the value is actually the path, not the base path
+        # (points to a version named directory like "1.1.12")
+        if self.VERSION_MATCHER.match(value.name):
+            self._base = value.parent
+            self.version = value.name
+            return
+
+        self._base = value
+
+    @attr
+    def path(self) -> Path:
+        """Return the path to the directory for this version in the working dir."""
+        if (not self._path) and self.base and self.version:
+            self._path = self.base / self.version
+        return self._path
 
     @classmethod
     def get_latest(cls) -> str:
@@ -182,7 +207,10 @@ class Workdir(Object):
 
     def chmod(self, path: Path = None):
         """Add write permissions to directory and all children recursively."""
-        path = path or self.path
+        path = path or self.base
+
+        if not (path and path.exists()):
+            raise VentoyMacosError("Cannot chmod. Nothing exists at path: {path}")
 
         # make always iterable
         paths = [path]
@@ -207,11 +235,15 @@ class Workdir(Object):
             # system chmod (go+rw)
             chmod(file, new)
 
-    def mkdirs(self):
-        """Create working directory and children."""
-        if not self.path:
-            self.path = tempfile.mkdtemp(
+    def mktemp(self):
+        """Create a tmp base working dir if base is not set."""
+        if not self.base:
+            self.base = tempfile.mkdtemp(
                 prefix="ventoy-macos-",
                 dir=self.TMPDIR,
             )
+
+    def mkdirs(self):
+        """Create working directory and children."""
+        self.mktemp()
         (self.path / "data").mkdir(parents=True, exist_ok=True)
