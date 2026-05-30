@@ -6,25 +6,25 @@ from rich.panel import Panel
 from rich.table import Table
 
 from tests import Stub
-from ventoy_macos.cli import CLI
 from ventoy_macos.logger import Logger
 from ventoy_macos.rule import Rule
+from ventoy_macos.ux import UX
 
 bp = breakpoint
 
 
 @pytest.fixture
-def cli() -> CLI:
-    """Return a CLI object."""
-    return CLI()
+def ux() -> UX:
+    """Return a UX object."""
+    return UX()
 
 
-def test_cli():
-    assert CLI()
+def test_ux():
+    assert UX()
 
 
-def test_cli_err(cli, capsys):
-    cli.err("Goodbye")
+def test_ux_err(ux, capsys):
+    ux.err("Goodbye")
     output = capsys.readouterr().err
 
     assert "Goodbye" in output
@@ -39,50 +39,45 @@ def test_cli_err(cli, capsys):
     ("n", False),
     ("q", False),
 ])
-def test_cli_confirm(cli, monkeypatch, reply, expected):
+def test_ux_confirm(ux, monkeypatch, reply, expected):
     with monkeypatch.context() as m:
         m.setattr('builtins.input', lambda *_: reply)
 
-        result = cli.confirm("Continue?")
+        result = ux.confirm("Continue?")
 
         assert result is expected
 
 
-def test_cli_has(cli):
-    assert cli.has("xxx") is False
-    assert cli.has("echo") is True
+def test_ux_console(ux):
+    assert isinstance(ux.console, Console)
 
 
-def test_cli_console(cli):
-    assert isinstance(cli.console, Console)
-
-
-def test_cli_log(cli):
-    assert isinstance(cli.log, Logger)
+def test_ux_log(ux):
+    assert isinstance(ux.log, Logger)
 
 
 @pytest.mark.enable_logging
-def test_cli_log_start(cli, tmp_path):
-    cli.log._path = tmp_path / "log"
-    cli.app = Stub(
+def test_ux_log_start(ux, tmp_path):
+    ux.log._path = tmp_path / "log"
+    ux.app = Stub(
         args=Stub(
             _get_kwargs=lambda: [("ventoy_version", "1.1.14")]
         )
     )
 
-    cli.log_start()
-    log = cli.log.path.read_text()
+    ux.log_start()
+    log = ux.log.path.read_text()
 
     assert "Starting." in log
     assert "Option: ventoy_version=1.1.14" in log
 
 
 @pytest.mark.enable_logging
-def test_cli_log_end(cli, tmp_path):
-    cli.log._path = tmp_path / "log"
+def test_ux_log_end(ux, tmp_path):
+    ux.log._path = tmp_path / "log"
 
-    cli.log_end()
-    log = cli.log.path.read_text()
+    ux.log_end()
+    log = ux.log.path.read_text()
 
     assert "Done. (ec=None)" in log
 
@@ -95,9 +90,9 @@ def test_cli_log_end(cli, tmp_path):
     (["abc"], dict(width=10), "  abc     \n"),
     (["abc", "def"], {}, ["  abc", "  def"]),
 ])
-def test_cli_print(capsys, args, kwargs, lines):
-    cli = CLI()
-    cli.print(*args, **kwargs)
+def test_ux_print(capsys, args, kwargs, lines):
+    ux = UX()
+    ux.print(*args, **kwargs)
 
     output = capsys.readouterr().out
 
@@ -106,17 +101,17 @@ def test_cli_print(capsys, args, kwargs, lines):
 
 
 @pytest.mark.skip
-def test_cli_pause():
+def test_ux_pause():
     ...
 
 
 @pytest.mark.skip
-def test_cli_confirm():
+def test_ux_confirm():
     ...
 
 
 @pytest.mark.skip
-def test_cli_status():
+def test_ux_status():
     ...
 
 
@@ -125,35 +120,35 @@ def test_cli_status():
     (["hello"], {}, ((line := "─" * 22) + " hello " + line[:-1])),
     (["hello"], {"width": 23}, ((line := "─" * 9) + " hello " + line[:-2])),
 ])
-def test_cli_rule(args, kwargs, expected):
-    cli = CLI()
-    cli.console.width = 50
-    hr = cli.rule(*args, **kwargs)
-    text = str(next(hr.__rich_console__(cli.console)))
+def test_ux_rule(args, kwargs, expected):
+    ux = UX()
+    ux.console.width = 50
+    hr = ux.rule(*args, **kwargs)
+    text = str(next(hr.__rich_console__(ux.console)))
 
     assert isinstance(hr, Rule)
     assert text == expected
 
 
-def test_cli_header():
+def test_ux_header():
     expected = (line := "─" * 8) + " hello " + line[:-2]
-    cli = CLI()
-    cli.console.width = 21
-    hr = cli.rule("hello")
-    text = str(next(hr.__rich_console__(cli.console)))
+    ux = UX()
+    ux.console.width = 21
+    hr = ux.rule("hello")
+    text = str(next(hr.__rich_console__(ux.console)))
 
     assert isinstance(hr, Rule)
     assert text == expected
 
 
-def test_cli_table(capsys):
-    cli = CLI()
-    table = cli.table(
+def test_ux_table(capsys):
+    ux = UX()
+    table = ux.table(
         [("a", "b")],
         headers=["A", "B"],
     )
 
-    cli.print(table)
+    ux.print(table)
     output = capsys.readouterr().out
     lines = output.splitlines()
 
@@ -162,40 +157,40 @@ def test_cli_table(capsys):
     assert "│ a │ b │" in lines[3]
 
 
-def test_cli_grid(capsys):
-    cli = CLI()
+def test_ux_grid(capsys):
+    ux = UX()
 
-    grid = cli.grid(
+    grid = ux.grid(
         [("Things:", "1")]
     )
-    cli.print(grid)
+    ux.print(grid)
     output = capsys.readouterr().out
 
     assert isinstance(grid, Table)
     assert "Things: 1" in output
 
 
-def test_cli_info_grid(capsys):
-    cli = CLI()
+def test_ux_info_grid(capsys):
+    ux = UX()
 
-    grid = cli.info_grid(
+    grid = ux.info_grid(
         [("Things:", "1")]
     )
-    cli.print(grid)
+    ux.print(grid)
     output = capsys.readouterr().out
 
     assert isinstance(grid, Table)
     assert "Things: 1" in output
 
 
-def test_cli_panel(capsys):
-    cli = CLI()
+def test_ux_panel(capsys):
+    ux = UX()
 
-    panel = cli.panel(
+    panel = ux.panel(
         "Things",
         "things",
     )
-    cli.print(panel)
+    ux.print(panel)
     output = capsys.readouterr().out
 
     assert isinstance(panel, Panel)
@@ -204,5 +199,5 @@ def test_cli_panel(capsys):
 
 
 #  @pytest.mark.skip
-#  def test_cli_():
+#  def test_ux_():
 #      ...

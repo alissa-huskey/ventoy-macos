@@ -6,6 +6,7 @@ import pytest
 from tests import Stub, noop, noop_context, return_false, return_true
 from ventoy_macos import Abort
 from ventoy_macos import cli as cli_module
+from ventoy_macos import ux as ux_module
 from ventoy_macos.cli import CLI
 from ventoy_macos.common import g2s
 from ventoy_macos.disk import Disk
@@ -407,7 +408,7 @@ def test_cli_format(monkeypatch, cli, capsys, planned_layout):
     with monkeypatch.context() as m:
         m.setattr(cli.disk.partitions[0], "format", noop)
         m.setattr(cli.disk.partitions[0], "unmount", noop)
-        m.setattr(cli_module, "sleep", noop)
+        m.setattr(ux_module, "sleep", noop)
         result = cli.format()
         output = capsys.readouterr().out
 
@@ -471,7 +472,7 @@ def test_cli_show_ventoy_info(capsys, cli):
 
 def test_cli_write_to_disk(monkeypatch, capsys, cli):
     with monkeypatch.context() as m:
-        m.setattr(cli_module, "sleep", noop)
+        m.setattr(ux_module, "sleep", noop)
 
         cli.app.builder = BuilderStub()
 
@@ -495,6 +496,11 @@ def test_cli_write_to_disk(monkeypatch, capsys, cli):
         assert "Finalizing all writes" in output
 
         assert output
+
+
+def test_cli_has(cli):
+    assert cli.has("xxx") is False
+    assert cli.has("echo") is True
 
 
 @pytest.mark.skip

@@ -16,5 +16,4 @@
 (C) 2026-05-27 Get the version from working director if possible
 (Z) 2026-05-28 @housekeeping investigate pytest-loguru: https://pypi.org/project/pytest-loguru/
 (C) 2026-05-29 Move .log from App -> Workdir @maybe
-
-2026-05-29 Split logic for printing and stuff from CLI -> ux.py
+x 2026-05-29 2026-05-29 Split logic for printing and stuff from CLI -> ux.py
