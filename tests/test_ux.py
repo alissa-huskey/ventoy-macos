@@ -30,24 +30,6 @@ def test_ux_err(ux, capsys):
     assert "Goodbye" in output
 
 
-@pytest.mark.parametrize(["reply", "expected"], [
-    ("y", True),
-    ("Y", True),
-    ("yes", True),
-    ("yes ", True),
-    ("yes please", False),
-    ("n", False),
-    ("q", False),
-])
-def test_ux_confirm(ux, monkeypatch, reply, expected):
-    with monkeypatch.context() as m:
-        m.setattr('builtins.input', lambda *_: reply)
-
-        result = ux.confirm("Continue?")
-
-        assert result is expected
-
-
 def test_ux_console(ux):
     assert isinstance(ux.console, Console)
 

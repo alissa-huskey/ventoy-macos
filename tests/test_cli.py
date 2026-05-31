@@ -74,7 +74,7 @@ def disk_stub(planned_layout) -> Disk:
 def app_stub(tmp_path, disk_stub):
     """Return a stub of an App object."""
     return Stub(
-        version="1.1.11",
+        version="1.1.12",
         disk=disk_stub,
         chmod=noop,
         workdir=Stub(
@@ -83,12 +83,14 @@ def app_stub(tmp_path, disk_stub):
             download=noop,
             extract=noop,
             has_images=return_false,
-            path=tmp_path,
+            base=tmp_path,
+            path=tmp_path / "1.1.12",
             request=lambda *a: Stub(ok=True),
             tarball_path=Stub(is_file=return_true),
             url="https://github.com/...",
             ventoy_dir=Stub(is_dir=return_true),
-            version="1.1.11",
+            version="1.1.12",
+            versions=[],
             images={
                 "boot_img": Stub(
                     dest=Stub(exists=return_true, path=Stub(name="boot.img")),
@@ -104,7 +106,7 @@ def app_stub(tmp_path, disk_stub):
 def mock_get_latest(monkeypatch):
     """Mock dir.get_latest()."""
     with monkeypatch.context() as m:
-        m.setattr(cli_module.Workdir, "get_latest", noop)
+        m.setattr(cli_module.Workdir, "get_latest", lambda: "1.1.12")
         yield
 
 
@@ -178,7 +180,7 @@ def test_cli_validate_sys_invalid_workdir(monkeypatch, assert_abort, cli):
     with monkeypatch.context() as m:
         m.setattr(cli_module, "geteuid", lambda: 0)
         m.setattr("sys.platform", "darwin")
-        m.setattr(cli.app.workdir, "path", Path("xxxxxxxxx"))
+        m.setattr(cli.app.workdir, "base", Path("xxxxxxxxx"))
         m.setattr(cli, "has", return_true)
 
         with assert_abort("Invalid working directory"):
@@ -229,41 +231,91 @@ def test_cli_validate_disk():
     assert cli.validate_disk()
 
 
-def test_cli_get_ventoy_with_version(mock_get_latest, capsys, cli):
+@pytest.mark.skip
+def test_cli_get_version_with_existing(mock_get_latest, capsys, cli):
+    """
+    GIVEN: A workdir that exists
+    AND: .app.version is not set
+    AND: it contains a directory named a version number (x.x.xx)
+    WHEN: .get_version() is called
+    THEN: it should not ask if you want to get the latest vetoy version
+    AND: it should not try to fetch the latest version
+    AND: it should ask if you want to use that version
+    AND: it should return that version
+    """
+    #  "Use Ventoy 1.1.13 from workdir"
+
+
+@pytest.mark.skip
+def test_cli_get_version_with_multiple_existing(mock_get_latest, capsys, cli):
+    """
+    GIVEN: A workdir that exists
+    AND: .app.version is not set
+    AND: it contains more than one directories named a version number (x.x.xx)
+    WHEN: .get_version() is called
+    THEN: it should ask which of those versions you want to use
+    AND: it should return the selected version
+    """
+    #  Found multiple ventoy downloads in /tmp/ventoy-macos-kylafimi:
+    #  - 1.1.11
+    #  - 1.1.12
+    #  > Version (blank for latest):
+
+
+@pytest.mark.skip("todo")
+def test_cli_get_version_with_existing_empty(mock_get_latest, capsys, cli):
+    ...
+
+
+@pytest.mark.skip
+def test_cli_get_version_with_existing(mock_get_latest, capsys, cli):
+    """
+    GIVEN: A workdir that exists
+    AND: it has a directory named a version number (x.x.xx)
+    AND: .app.version is not set
+    WHEN: .get_version() is called
+    THEN: it should not ask if you want to get the latest vetoy version
+    AND: it should not try to fetch the latest version
+    AND: it should ask if you want to use that version
+    AND: it should return that version
+    AND: it should return the that version
+    """
+
+
+def test_cli_get_version_with_version(mock_get_latest, capsys, cli):
     """
     GIVEN: A workdir that exists
     AND: .app.version is set
-    WHEN: .get_ventoy() is called
+    WHEN: .get_version() is called
     THEN: it should not ask if you want to get the latest vetoy version
     AND: it should not try to fetch the latest version
     AND: it should say that it will use the disk images in workdir
     AND: it should return True
     """
-    result = cli.get_ventoy()
+    result = cli.get_version()
     output = capsys.readouterr().out
 
     assert "Request latest Ventoy release number?" not in output
     assert "Fetching version" not in output
-    assert result is True
+    assert result == "1.1.12"
 
 
-def test_cli_get_ventoy_without_version(mock_get_latest, capsys, cli):
+def test_cli_get_version_without_version(mock_get_latest, capsys, cli):
     """
     GIVEN: A workdir that exists
     AND: .app.version is set
-    WHEN: .get_ventoy() is called
-    THEN: it should not ask if you want to get the latest vetoy version
-    AND: it should not try to fetch the latest version
-    AND: it should say that it will use the disk images in workdir
+    WHEN: .get_version() is called
+    THEN: it should ask if you want to get the latest vetoy version
+    AND: it should try to fetch the latest version
     AND: it should return True
     """
     cli.app.version = None
-    result = cli.get_ventoy()
+    result = cli.get_version()
     output = capsys.readouterr().out
 
     assert "Request latest Ventoy release number?" in output
     assert "Fetching version" in output
-    assert result is True
+    assert result == "1.1.12"
 
 
 def test_cli_get_ventoy_with_disk_images(mock_get_latest, capsys, cli):
@@ -365,7 +417,7 @@ def test_cli_get_ventoy_without_tarball(mock_get_latest, capsys, cli):
     output = capsys.readouterr().out
 
     assert "Using Ventoy tarball" not in output
-    assert "Download Ventoy?" in output
+    assert "Download Ventoy" in output
     assert "Downloading:" in output
     assert "Extracting Ventoy package" in output
     assert "Decompressing disk images" in output
@@ -433,7 +485,7 @@ def test_cli_success(capsys, planned_layout):
     planned_layout[1].id = "/dev/disk4s2"
 
     cli = CLI(
-      app=Stub(version="1.1.11"),
+      app=Stub(version="1.1.12"),
       disk=Stub(
         location="/dev/disk4",
         gb=64,
@@ -447,7 +499,7 @@ def test_cli_success(capsys, planned_layout):
     result = cli.success()
     output = capsys.readouterr().out
 
-    assert "Ventoy 1.1.11 installed successfully!" in output
+    assert "Ventoy 1.1.12 installed successfully!" in output
     assert "Name: Flash Drive" in output
     assert "Partition Scheme: GUID_partition_scheme" in output
     assert "Location: /dev/disk4" in output
@@ -464,7 +516,7 @@ def test_cli_show_ventoy_info(capsys, cli):
     cli.show_ventoy_info()
     output = capsys.readouterr().out
 
-    assert "Ventoy Version: 1.1.11" in output
+    assert "Ventoy Version: 1.1.12" in output
     assert "Working Directory:" in output
     assert "Log file: /tmp/ventoy-macos.log" in output
     assert "boot.img 512 bytes" in output

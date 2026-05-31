@@ -7,7 +7,7 @@ from os import geteuid
 
 from rich.panel import Panel
 
-from ventoy_macos import Abort, VentoyMacosWriteError
+from ventoy_macos import Abort, VentoyMacosError, VentoyMacosWriteError
 from ventoy_macos.app import App
 from ventoy_macos.common import b2s, run, s2b, size_text
 from ventoy_macos.logger import log_catch
@@ -126,9 +126,9 @@ class CLI(UX):
                 "Install it with: brew install xz"
             )
 
-        if not self.app.workdir.path.is_dir():
+        if not self.app.workdir.base.is_dir():
             raise Abort(
-                f"Invalid working directory: {self.app.workdir}"
+                f"Invalid working directory: {self.app.workdir.base}"
             )
 
         return True
@@ -138,7 +138,7 @@ class CLI(UX):
         # disk must exist and start with /dev/disk
         if not self.disk.is_disk():
             raise Abort(
-                f"Device invalid or not mounted: {self.disk}",
+                f"Device invalid or not mounted: {self.disk.location}",
                 '(Hint: must start with "/dev/disk".)'
             )
 
@@ -162,23 +162,62 @@ class CLI(UX):
 
         return True
 
-    def get_ventoy(self):
-        """Download and extract Ventoy."""
-        self.print(self.header("Collecting Ventoy disk images"), before=1, after=1)
+    def get_version(self):
+        """Get the ventoy version.
+
+        Search the working directory for subdirectories with version names, and
+        give the user the option to that version.
+
+        Otherwise, request the latest version from github.
+        """
+        if self.app.version:
+            return self.app.version
 
         workdir = self.app.workdir
+        version = None
 
-        if not self.app.version:
+        # if one Ventoy version dir is found in workdir
+        if len(workdir.versions) == 1:
+            wd = list(workdir.versions.values())[0]
+            if self.confirm(
+                f"Use Ventoy {wd.version} from workdir: {wd.path}?",
+            ):
+                version = wd.version
+
+        # if more than one Ventoy version dir is found in workdir
+        elif len(workdir.versions) > 1:
+            version = self.select(
+                choices=workdir.versions.keys(),
+                preface=f"Found multiple ventoy downloads in {workdir.base}:",
+                hidden=[""],
+            )
+
+        # if a version was set through the previous steps, set the workdir
+        if version:
+            self.app.workdir = workdir.versions[version]
+
+        # request the latest version number from github
+        else:
             if self.confirm("Request latest Ventoy release number?", persist=False):
                 with self.status("Fetching version"):
-                    self.app.version = Workdir.get_latest()
+                    version = Workdir.get_latest()
             else:
                 self.print(
                     "Ok. Use the --ventoy-version option next time.",
                     padding=None,
                     before=1,
                 )
-                exit()
+
+        # set and return the version
+        self.app.version = version
+        self.app.workdir.version = version
+        return version
+
+    def get_ventoy(self):
+        """Download and extract Ventoy."""
+        self.print(self.header("Collecting Ventoy disk images"), before=1, after=1)
+
+        workdir = self.app.workdir
 
         # skip everything if there are already disk images
         if workdir.has_images():
@@ -195,11 +234,14 @@ class CLI(UX):
             if workdir.tarball_path.is_file():
                 self.done(f"Using Ventoy tarball in {workdir.path}")
             else:
-                if not self.confirm("Download Ventoy?", persist=False):
+                if not self.confirm(
+                    f"Download Ventoy {self.app.version}?",
+                    persist=False,
+                ):
                     self.print(
                         (
                             "Ok. Next time use --dir to "
-                            "point to your local downloads.",
+                            "point to your local downloads."
                         ),
                         before=1,
                         padding=None,
@@ -207,7 +249,15 @@ class CLI(UX):
                     exit()
 
                 with self.status(f"Downloading: {workdir.url}"):
-                    workdir.download()
+                    try:
+                        workdir.download()
+                    except VentoyMacosError as ex:
+                        if ex.response.status_code == 404:
+                            raise Abort(
+                                f"No such Ventoy version: {self.app.version}",
+                                prefix=":exclamation:"
+                            )
+                        raise ex
 
             with self.status("Extracting Ventoy package"):
                 workdir.extract()
@@ -467,7 +517,6 @@ class CLI(UX):
         self.parse_args()
 
         self.app = App(self.args)
-        self.app.workdir.mkdirs()
         self.disk = self.app.disk
         self.log = self.app.log
         self.log_start()
@@ -482,6 +531,11 @@ class CLI(UX):
             self.console.force_interactive = False
 
         self.validate_sys()
+
+        if not self.app.version:
+            self.get_version()
+
+        self.app.workdir.mkdirs()
 
         self.get_ventoy()
 

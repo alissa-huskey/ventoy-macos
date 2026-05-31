@@ -39,3 +39,4 @@ x 2026-05-29 2026-05-29 App.workdir: try to make it a Workdir object (see where 
 x 2026-05-29 2026-05-29 Put all ventoy files into version subdir in workdir
 x 2026-05-29 2026-05-29 Detect if workdir.base matches x.x.xx and and base/path/version accordingly.
 x 2026-05-29 2026-05-29 Split logic for printing and stuff from CLI -> ux.py
+x 2026-05-30 2026-05-27 Get the version from working director if possible

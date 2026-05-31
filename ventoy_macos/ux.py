@@ -9,14 +9,15 @@ from rich.console import Console, Group
 from rich.control import Control
 from rich.padding import Padding
 from rich.panel import Panel
-from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
+from rich.theme import Theme
 from rich.traceback import install as rich_tracebacks
 
 from ventoy_macos._exclude import EXCLUDE
 from ventoy_macos.logger import Logger
 from ventoy_macos.object import Object
+from ventoy_macos.prompt import Prompt
 from ventoy_macos.rule import Rule
 
 rich_tracebacks(show_locals=True, suppress=EXCLUDE)
@@ -32,9 +33,24 @@ class UX(Object):
     logic.
     """
 
+    custom_theme = Theme({
+        "checkmark": "green",
+        "error": "#af0000",
+        "error.epilog": "dim",
+        "prompt.choices": "dark_magenta",
+        "prompt.invalid": "bright_red",
+        "prompt.prefix": "dark_cyan",
+        "prompt.option": "none",
+        "prompt.number": "bright_blue",
+        "rule.line": "purple4",
+        "table.border": "dark_cyan",
+        "table.header": "bold",
+        "warn": "#af0000 bold",
+    })
+
     screen = Control()
 
-    stderr = Console(stderr=True)
+    stderr = Console(stderr=True, theme=custom_theme)
 
     enable_interactive = None
 
@@ -55,6 +71,7 @@ class UX(Object):
                 emoji=True,
                 width=int(Console().width * 0.9),
                 force_interactive=self.enable_interactive,
+                theme=self.custom_theme,
             )
         return self._console
 
@@ -133,8 +150,7 @@ class UX(Object):
         Returns:
             Align renderable (centered)
         """
-        style = "#af0000 bold"
-        icon = f"[{style}]:warning:[/{style}]"
+        icon = "[warn]:warning:[/warn]"
         message = Align(
             f"{icon} Warning: {message} {icon}",
             align="center",
@@ -164,17 +180,17 @@ class UX(Object):
             lines = list(message)
             message = lines.pop(0)
 
-        prefix = (prefix or "[#af0000]Error[/#af0000]")
+        prefix = (prefix or "[error]Error[/error]")
 
         self.stderr.print(f"{prefix} {message}")
 
         spaces = Text.from_markup(prefix).cell_len + 1
         for line in lines:
-            self.stderr.print(" " * spaces + line, style="dim")
+            self.stderr.print(" " * spaces + line, style="error.epilog")
 
     def done(self, task):
         """Print a task with a checkmark."""
-        self.print(f"[green]✔[/green] {task}")
+        self.print(f"[checkmark]✔[/checkmark] {task}")
 
     # ── Interactive ──────────────────────────────────────────────────────
 
@@ -182,11 +198,53 @@ class UX(Object):
         """Pause for `seconds` seconds."""
         sleep(seconds)
 
-    def confirm(self, prompt: str, persist=True) -> bool:
+    def erase(self, n: int = 1):
+        """Remove `n` lines of printed output from the screen.
+
+        Overwrite `n` lines above with spaces then move the cursor up `n`
+        lines.
+        """
+        lines = -(n + 2)
+
+        for i in range(lines, 0):
+            print(self.screen.move(0, i))
+            print(" " * self.console.width)
+
+        print(self.screen.move(0, lines))
+
+    def ask(self, question: str, persist=True, **kwargs) -> str:
+        """Ask a question.
+
+        Arguments:
+            question (str): the question
+            persist (bool, default=True): if the prompt text should persist in
+                stdout. if False, the relevant lines on the screen will be
+                cleared and overwritten
+            kwargs: keyword arguments to send to Prompt()
+
+        Returns:
+            Prompts the user and return the input.
+        """
+        prompt = Prompt(question, console=self.console, **kwargs)
+
+        if not persist:
+            self.erase(prompt.retries + 1)
+
+        answer = prompt.ask()
+
+        # remove the printed prompt output from the screen
+        # (go back and clear out the previous lines where the prompt
+        # message was printed and leave the cursor there to overwrite)
+        #  if not persist:
+        #      self.erase()
+
+        return answer
+
+    def confirm(self, question: str, persist=True) -> bool:
         """Ask a yes/no question.
 
         Arguments:
-            prompt (str): the question
+            question (str): the question
             persist (bool, default=True): if the prompt text should persist in
                 stdout. if False, the relevant lines on the screen will be
                 cleared and overwritten
@@ -194,21 +252,46 @@ class UX(Object):
         Returns:
             True for a y/Y answer, otherwise False
         """
-        answer = Prompt.ask(
-            "  "
-            "[green1]>[/green1] "
-            fr"{prompt} [dark_magenta]\[y/n]"
+        prompt = Prompt(
+            question,
+            console=self.console,
+            show_choices="y/N"
         )
 
-        # remove the printed prompt output from the screen
-        # (go back and clear out the previous lines where the prompt
-        # message was printed and leave the cursor there to overwrite)
-        if not persist:
-            print(self.screen.move(0, -2))
-            print(" " * self.console.width)
-            print(self.screen.move(0, -2))
+        answer = prompt.confirm()
 
-        return answer.lower() in ("y", "yes")
+        if not persist:
+            self.erase(prompt.retries + 1)
+
+        return answer
+
+    def select(self, choices: list, preface: str = None, **kwargs):
+        """Prompt the user to choose from an enumerated list of options.
+
+        Print an numbered list of options and prompt the user to choose one.
+        Valid choices include the choices themselves as well as the numbers
+        listed beside them.
+
+        Upon receiving invalid options, the question will repeat a number of
+        times before finally aborting.
+
+        To allow an empty response, pass hidden=[""].
+
+        Arguments:
+            choices (list): The list of options
+            preface (str, optional): Text to print before the options
+            kwargs: keyword arguments to send to Prompt.select()
+        """
+        prompt = Prompt.select(
+            choices=choices,
+            preface=preface,
+            console=self.console,
+            **kwargs,
+        )
+
+        answer = prompt.ask()
+
+        return answer
 
     @contextmanager
     def status(self, task: str, persist: bool = True):
@@ -261,7 +344,6 @@ class UX(Object):
             title,
             align="left",
             end_size=2,
-            style="purple4",
         )
 
         if print:
@@ -321,7 +403,7 @@ class UX(Object):
         """
         return self.grid(
             rows=rows,
-            columns={0: dict(style="bold", justify="right")}
+            columns={0: dict(style="table.header", justify="right")}
         )
 
     def panel(self, title: str, *data, **kwargs) -> Panel:
@@ -334,7 +416,7 @@ class UX(Object):
             kwargs: Panel() options
         """
         options = dict(
-            border_style="dark_cyan",
+            border_style="table.border",
             title_align="left",
         )
         options.update(kwargs)

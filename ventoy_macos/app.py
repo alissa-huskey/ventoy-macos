@@ -44,7 +44,7 @@ class App(Object):
     @cached_property
     def log(self) -> Logger:
         """Return a Logger instance."""
-        return Logger(path=self.workdir.path / "ventoy-macos.log")
+        return Logger(path=self.workdir.base / "ventoy-macos.log")
 
     @attr
     def workdir(self) -> Path:

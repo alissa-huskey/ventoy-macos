@@ -1,13 +1,26 @@
-from pathlib import Path
 from string import ascii_lowercase
 
 import pytest
 
+from tests import noop
 from ventoy_macos import logger as logger_module
 from ventoy_macos.disk import Disk
 from ventoy_macos.partition import Partition
 
 bp = breakpoint
+
+
+@pytest.fixture
+def pop_responses():
+    """Return a mock to return the first popped value from an iter."""
+    def mk_mock(responses, func=noop):
+        """Return a mock function."""
+        def mock(*args, **kwargs):
+            """Call the function then return the first value from responses."""
+            func(*args, **kwargs)
+            return responses.pop(0)
+        return mock
+    return mk_mock
 
 
 @pytest.fixture

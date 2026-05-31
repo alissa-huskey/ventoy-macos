@@ -13,7 +13,8 @@
 (Z) 2026-05-25 After failed install, offer to reformat the disk (diskutil eraseDisk ExFAT UNTITLED GPT /dev/disk4)
 (Z) 2026-05-25 Add to Disk.verify()
 (A) 2026-05-26 Test to make sure ventoy disk actually boots.
-(C) 2026-05-27 Get the version from working director if possible
+x 2026-05-30 2026-05-27 Get the version from working director if possible
 (Z) 2026-05-28 @housekeeping investigate pytest-loguru: https://pypi.org/project/pytest-loguru/
 (C) 2026-05-29 Move .log from App -> Workdir @maybe
-x 2026-05-29 2026-05-29 Split logic for printing and stuff from CLI -> ux.py
+2026-05-30 Move cli.py etc to cli/ subdir
+2026-05-30 If ventoy version is invalid, remove from workdir

@@ -281,6 +281,20 @@ def test_workdir_base_is_path(tmp_path, version_path):
     assert workdir.version == "1.1.12"
 
 
+def test_workdir_versions(tmp_path):
+    version_numbers = ("1.1.11", "1.1.12")
+    versions = {}
+
+    workdir = Workdir(tmp_path)
+
+    for v in version_numbers:
+        wd = Workdir(tmp_path, version=v)
+        (tmp_path / v).mkdir()
+        versions[v] = wd
+
+    assert workdir.versions == versions
+
+
 #  @pytest.mark.skip
 #  def test_workdir_():
 #      ...

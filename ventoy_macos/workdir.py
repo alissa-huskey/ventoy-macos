@@ -1,6 +1,7 @@
 """Logic related to the working directory."""
 
 import tempfile
+from functools import cached_property
 from os import chmod
 from pathlib import Path
 from re import compile as re_compile
@@ -97,6 +98,17 @@ class Workdir(Object):
 
         self._base = value
 
+    @cached_property
+    def versions(self) -> list:
+        """Return a list of Workdir objects for every version directory in base."""
+        if not self.base and self.base.is_dir():
+            return {}
+        klass = self.__class__
+        return {
+            p.name: klass(p) for p in self.base.iterdir()
+            if self.VERSION_MATCHER.match(p.name)
+        }
+
     @attr
     def path(self) -> Path:
         """Return the path to the directory for this version in the working dir."""
@@ -125,7 +137,7 @@ class Workdir(Object):
         if not response.ok:
             raise VentoyMacosError(
                 f"Request Failed [{response.status_code} {response.reason}]: {url}",
-                response=response
+                response=response,
             )
 
         return response
